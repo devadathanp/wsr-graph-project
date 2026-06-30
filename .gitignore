@@ -1,0 +1,9 @@
+report_assets/
+*.png
+*.pptx
+!templates/*.pptx
+__pycache__/
+*.pyc
+.Python
+.venv/
+venv/
