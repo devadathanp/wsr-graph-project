@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 
@@ -357,16 +355,15 @@ def pending_week_for_chart(chart_week: int) -> int:
 
 
 def graph_week_capacity(data_file: str, pending_week: int, mode: str) -> int:
-    if mode == "evaluation":
-        section = get_evaluation_data(data_file=data_file)
-        col = "Eval In Progress"
-    else:
-        section = get_implementation_data(data_file=data_file)
-        col = "Eval In Progress"
+    section = (
+        get_evaluation_data(data_file=data_file)
+        if mode == "evaluation"
+        else get_implementation_data(data_file=data_file)
+    )
     match = section[section["Week No"] == pending_week]
     if match.empty:
         return 12
-    value = match.iloc[0].get(col)
+    value = match.iloc[0].get("Eval In Progress")
     if pd.isna(value):
         return 12
     return max(1, min(int(value), 12))

@@ -13,14 +13,11 @@ from pptx.util import Inches, Pt
 
 DEFAULT_TEMPLATE = Path(__file__).parent / "templates" / "CES_CSAR_WSR_Template.pptx"
 
-# Extracted from template theme1.xml
+# Cummins / CES deck palette (from template theme1.xml)
 ACCENT_LIME = RGBColor(0xB0, 0xFF, 0x45)      # accent1
-ACCENT_GREEN = RGBColor(0x8F, 0xDB, 0x00)    # accent2
-ACCENT_GREEN_DARK = RGBColor(0x42, 0x80, 0x03)  # accent3
 TEXT_DARK = RGBColor(0x16, 0x17, 0x18)       # dk1
 TEXT_MUTED = RGBColor(0x4D, 0x51, 0x54)      # dk2
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
-LIGHT_GRAY = RGBColor(0xE6, 0xE7, 0xE8)      # lt2
 
 FONT_MAJOR = "Work Sans Medium"
 FONT_BODY = "Work Sans"

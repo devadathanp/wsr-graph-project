@@ -51,12 +51,8 @@ from wsr_common import (
     week_remarks,
 )
 from wsr_style import (
-    ACCENT_GREEN_DARK,
-    AGENDA_ITEM_SIZE,
-    BODY_SIZE,
     DEFAULT_TEMPLATE,
     FONT_BODY,
-    FONT_MAJOR,
     TEXT_DARK,
     TEXT_MUTED,
     add_number_badge,
@@ -67,8 +63,6 @@ from wsr_style import (
     set_slide_title,
     style_agenda_run,
     style_body_run,
-    style_footer_run,
-    style_section_title_run,
     style_table_cells,
     style_title_run,
 )
