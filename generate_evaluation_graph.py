@@ -6,26 +6,45 @@ import numpy as np
 # READ EXCEL
 # =====================================================
 
-file_path = "data.xlsx"
+file_path = "data.xlsm"
 
-sheet_name = "CSR_WSAR_Graph (Non-STLA)"
+sheet_name = "CSAR_WSR_Graph (Non-STLA)"
 
 df = pd.read_excel(
     file_path,
-    sheet_name=sheet_name
+    sheet_name=sheet_name,
+    header=2,
 )
 
 # -----------------------------------------------------
 # FILTER EVALUATION SECTION
 # -----------------------------------------------------
 
-impl = df[
-    df["Tagged to Release"]
-    .astype(str)
-    .str.contains("Evaluation", na=False)
-].copy()
+impl_header_idx = df.index[
+    df["Tagged to Release"].astype(str).str.strip() == "Implementation"
+]
 
+eval_df = df.loc[: impl_header_idx[0] - 1]
+impl = eval_df[eval_df["Week No"].notna()].copy()
 impl.reset_index(drop=True, inplace=True)
+
+progress_col = "Eval In Progress"
+
+
+def to_percentage(series):
+    def convert(value):
+        if pd.isna(value):
+            return np.nan
+        if isinstance(value, (int, float)):
+            val = float(value)
+            return val * 100 if abs(val) <= 1.5 else val
+        text = str(value).replace("%", "").strip()
+        if text == "":
+            return np.nan
+        val = float(text)
+        return val * 100 if abs(val) <= 1.5 else val
+
+    return series.apply(convert)
 
 # -----------------------------------------------------
 # X AXIS LABELS
@@ -85,10 +104,10 @@ bars4 = ax1.bar(
 
 bars5 = ax1.bar(
     x + 2*bar_width,
-    impl["Impl In Progress"],
+    impl[progress_col],
     width=bar_width,
     color="#FFF000",
-    label="Impl In Progress"
+    label="Eval In Progress"
 )
 
 # =====================================================
@@ -97,20 +116,8 @@ bars5 = ax1.bar(
 
 ax2 = ax1.twinx()
 
-confidence = (
-    impl["% Completion Confidence - Overall"]
-    .astype(str)
-    .str.replace("%", "")
-    .astype(float)
-)
-
-actual = (
-    impl["% Actual weekly completion wr.t  revised Baseline"]
-    .astype(str)
-    .str.replace("%", "")
-    .replace("", np.nan)
-    .astype(float)
-)
+confidence = to_percentage(impl["% Completion Confidence - Overall"])
+actual = to_percentage(impl["% Actual weekly completion wr.t  revised Baseline"])
 
 line1 = ax2.plot(
     x,
