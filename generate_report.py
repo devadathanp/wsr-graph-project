@@ -6,25 +6,20 @@ Uses templates/CES_CSAR_WSR_Template.pptx for brand fonts (Work Sans), colours, 
 table styles extracted from the reference deck.
 
 ================================================================================
-TODO — HARDCODED SECTIONS (not sourced from data.xlsm yet)
+TODO — STRUCTURAL / NARRATIVE SECTIONS (not tabular data from Excel)
 ================================================================================
-1. Presenter name on title slide
-2. Agenda slide bullets
-3. MOM & Action Items (meeting-specific narrative)
-4. DCR status weekly narrative paragraphs (WK22–WK24) — fallback when graph Remarks empty
-5. Risks & Mitigation content
-6. Issues slide content
-7. Quarterly planning chart values fallback
-8. Closing slide backdrop image path (optional --closing-image)
+1. Agenda slide bullets
+2. Closing slide backdrop image path (optional --closing-image)
 ================================================================================
-SOURCED FROM data.xlsm (Non STLA, Visibility, DDP_Plan, planning, graph sheets)
+SOURCED FROM data.xlsm and Book2.xlsx
 ================================================================================
 - Pending eval/impl DCR tables
 - DCR status summary callout boxes
 - DDP MS4-5 slide
-- Eval handoff slide (from Non_STLA Planning — Eval COmpleted column)
+- Eval handoff slide (Non_STLA Planning dates)
 - Discussion points (at-risk DCRs)
 - Charts and graph totals
+- Quarterly planning chart (Book2.xlsx)
 ================================================================================
 """
 
@@ -84,9 +79,14 @@ from wsr_style import (
     TEXT_MUTED,
     TITLE_SIZE,
     WHITE,
+    TABLE_HEADER_ROW_HEIGHT_IN,
+    TABLE_LEFT_IN,
+    TABLE_WIDTH_IN,
     add_number_badge,
+    content_top_below_title,
     delete_all_slides,
     find_placeholder,
+    fit_table_column_widths,
     set_run_font,
     set_slide_footer,
     set_slide_title,
@@ -100,24 +100,11 @@ from wsr_style import (
 LAYOUT_OPENING = 13
 LAYOUT_CONTENT = 3
 
-HARDCODED_PRESENTER = "Chitharenjan Nair"
-HARDCODED_AGENDA = [
+AGENDA_ITEMS = [
     "MOM & Action Items",
     "DCR Status",
     "Discussion Points",
     "Issues and Risks",
-]
-HARDCODED_MOM_ROWS = [
-    {
-        "discussion": "DCR 18922156 Phase 35 OBD REAL Regen Trigger Issue (Core 2 DCR). ",
-        "action": "Implementation deferred to Q4'26.",
-        "status": "Eval completed, Implementation deferred.",
-        "owner": "PFS Team",
-        "closure": "18-06-2026",
-        "remarks": "Yue and Dhanraj confirmed that OBD REAL Regen Trigger issue for Core 2 program "
-        "is not urgent in Q3'26. PFS Team need to work on the new Defect DCR for "
-        "AftSootFiltFrqntRegenDiag component for both Eval and Impl.",
-    }
 ]
 AGENDA_BADGE_SIZE = 1.04
 AGENDA_LAYOUT = [
@@ -126,18 +113,11 @@ AGENDA_LAYOUT = [
     {"badge_top": 3.29, "text_left": 1.66, "text_top": 3.57},
     {"badge_top": 4.27, "text_left": 1.72, "text_top": 4.59},
 ]
-HARDCODED_WEEKLY_NARRATIVE = {
-    22: "WK:22 — 1 DCR: L2 Comments fixing",
-    23: "WK:23 — Same as WK22 | 1 DCR: Awaiting CDS Review | 2 DCR's Awaiting L2 Review",
-    24: "WK:24 — 12 DCR Closure pending | 5 DCR for L2 Reverification | 1 DCR WIP | 6 DCR Eval Closed",
-}
-FALLBACK_QUARTERLY_PLANNING = {
-    "available_hours": 7514,
-    "planned_pct": 90,
-    "planned_hours": 6754,
-    "resources": 17,
-}
 DEFAULT_PLANNING_BOOK = Path(__file__).parent / "Book2.xlsx"
+
+
+def _empty_row(column_count: int) -> list[str]:
+    return ["-"] * column_count
 
 
 def _as_float(value) -> float | None:
@@ -149,10 +129,10 @@ def _as_float(value) -> float | None:
         return None
 
 
-def load_quarterly_planning(planning_book: str | Path | None = None) -> dict[str, int]:
+def load_quarterly_planning(planning_book: str | Path | None = None) -> dict[str, int] | None:
     workbook_path = Path(planning_book) if planning_book else DEFAULT_PLANNING_BOOK
     if not workbook_path.exists():
-        return FALLBACK_QUARTERLY_PLANNING.copy()
+        return None
 
     wb = load_workbook(workbook_path, data_only=True)
     ws = wb[wb.sheetnames[0]]
@@ -163,7 +143,7 @@ def load_quarterly_planning(planning_book: str | Path | None = None) -> dict[str
     resources_raw = _as_float(ws["I44"].value)
 
     if None in (available_hours, planned_hours, planned_pct_raw, resources_raw):
-        return FALLBACK_QUARTERLY_PLANNING.copy()
+        return None
 
     return {
         "available_hours": int(round(available_hours)),
@@ -213,17 +193,14 @@ def _add_title_slide(prs: Presentation, report_date: str):
 
     presenter_ph = find_placeholder(slide, idx=23)
     if presenter_ph is not None:
-        presenter_ph.text = HARDCODED_PRESENTER
-        for paragraph in presenter_ph.text_frame.paragraphs:
-            for run in paragraph.runs:
-                style_body_run(run)
+        presenter_ph.text = ""
 
     set_slide_footer(slide, report_date, 1)
 
 
 def _add_agenda_slide(prs: Presentation, report_date: str):
     slide = _new_content_slide(prs, "Agenda", report_date, 2)
-    for idx, (item, layout) in enumerate(zip(HARDCODED_AGENDA, AGENDA_LAYOUT), start=1):
+    for idx, (item, layout) in enumerate(zip(AGENDA_ITEMS, AGENDA_LAYOUT), start=1):
         add_number_badge(
             slide,
             str(idx),
@@ -256,19 +233,8 @@ def _add_mom_slide(prs: Presentation, report_date: str):
         "Action closure date",
         "Remarks",
     ]
-    rows = [
-        [
-            str(idx),
-            row["discussion"],
-            row["action"],
-            row["status"],
-            row["owner"],
-            row["closure"],
-            row["remarks"],
-        ]
-        for idx, row in enumerate(HARDCODED_MOM_ROWS, start=1)
-    ]
-    _add_table(slide, headers, rows, top=1.0, col_widths=[0.55, 2.2, 1.5, 1.3, 0.85, 1.1, 2.35])
+    rows = [_empty_row(len(headers))]
+    _add_table(slide, headers, rows, col_widths=[0.6, 2.6, 1.7, 1.0, 0.95, 1.45, 3.0])
 
 
 def _add_dcr_status_slide(
@@ -317,13 +283,10 @@ def _add_dcr_status_slide(
     ntf.word_wrap = True
     note_lines = []
     for week in (pending_week - 1, pending_week, chart_week):
-        hardcoded = HARDCODED_WEEKLY_NARRATIVE.get(week)
         from_data_eval = week_remarks(eval_data, week)
         from_data_impl = week_remarks(impl_data, week)
         if from_data_eval or from_data_impl:
             note_lines.append(f"WK:{week} — Eval: {from_data_eval or '-'} | Impl: {from_data_impl or '-'}")
-        elif hardcoded:
-            note_lines.append(hardcoded)
     for i, line in enumerate(note_lines):
         para = ntf.paragraphs[0] if i == 0 else ntf.add_paragraph()
         run = para.add_run()
@@ -354,7 +317,7 @@ def _add_pending_slide(
             ]
             for i, item in enumerate(items)
         ]
-        widths = [0.5, 0.75, 2.7, 1.6, 1.0, 2.6]
+        widths = [0.58, 0.9, 3.4, 1.85, 1.45, 3.0]
     else:
         headers = ["Sr No", "DCR ID", "Summary", "Current Status", "Remarks"]
         rows = [
@@ -367,14 +330,12 @@ def _add_pending_slide(
             ]
             for i, item in enumerate(items)
         ]
-        widths = [0.5, 0.75, 3.2, 1.8, 2.9]
+        widths = [0.58, 0.9, 4.4, 2.2, 3.2]
 
     if not rows:
-        rows = [["-", "-", "No open items found with current filters", "-", "-"]]
-        if mode == "evaluation":
-            rows[0].append("-")
+        rows = [_empty_row(len(headers))]
 
-    _add_table(slide, headers, rows, top=0.95, col_widths=widths)
+    _add_table(slide, headers, rows, col_widths=widths)
 
 
 def _add_ddp_slide(prs: Presentation, report_date: str, items: list[dict]):
@@ -403,13 +364,12 @@ def _add_ddp_slide(prs: Presentation, report_date: str, items: list[dict]):
         for item in items
     ]
     if not rows:
-        rows = [["-", "-", "No DDP MS4-5 rows matched filters", "-", "-", "-", "-", "-"]]
+        rows = [_empty_row(len(headers))]
     _add_table(
         slide,
         headers,
         rows,
-        top=0.95,
-        col_widths=[0.45, 0.7, 2.0, 0.9, 0.9, 0.65, 1.55, 1.9],
+        col_widths=[0.55, 0.9, 3.2, 1.2, 1.25, 0.9, 2.2, 2.5],
     )
 
 
@@ -429,8 +389,8 @@ def _add_handoff_slide(prs: Presentation, report_date: str, items: list[dict]):
             ]
         )
     if not rows:
-        rows = [["-", "-", "No eval handoff rows for this month", "-", "-", "-"]]
-    _add_table(slide, headers, rows, top=0.95, col_widths=[0.55, 0.75, 2.9, 0.9, 1.2, 1.9])
+        rows = [_empty_row(len(headers))]
+    _add_table(slide, headers, rows, col_widths=[0.62, 0.9, 3.6, 1.05, 1.55, 2.6])
 
 
 def _add_discussion_slide(prs: Presentation, report_date: str, items: list[dict]):
@@ -448,31 +408,46 @@ def _add_discussion_slide(prs: Presentation, report_date: str, items: list[dict]
         for i, item in enumerate(items)
     ]
     if not rows:
-        rows = [["-", "No high-priority discussion points found", "-", "-", "-", "-"]]
-    _add_table(slide, headers, rows, top=0.95, col_widths=[0.35, 3.0, 0.75, 0.7, 1.2, 2.5])
+        rows = [_empty_row(len(headers))]
+    _add_table(slide, headers, rows, col_widths=[0.42, 3.8, 0.95, 0.9, 1.55, 3.0])
 
 
 def _add_impact_legend(slide):
-    """Risk/issues impact legend (matches reference slide 10 footer)."""
+    """Risk/issues impact legend with spacing so labels do not overlap."""
     legend_items = [
-        (RGBColor(0xFF, 0x00, 0x00), "High Impact / High Possibility", 0.76, 0.98, 6.38),
-        (RGBColor(0xFF, 0xC0, 0x00), "Medium Impact / Medium Possibility", 3.32, 3.48, 6.38),
-        (RGBColor(0x92, 0xD0, 0x50), "Low Impact / Low Possibility", 6.23, 6.45, 6.39),
+        (RGBColor(0xFF, 0x00, 0x00), "High Impact / High Possibility"),
+        (RGBColor(0xFF, 0xC0, 0x00), "Medium Impact / Medium Possibility"),
+        (RGBColor(0x92, 0xD0, 0x50), "Low Impact / Low Possibility"),
     ]
-    for color, label, square_left, text_left, square_top in legend_items:
+    square_top = 6.36
+    text_top = 6.33
+    item_width = 3.95
+    gap = 0.35
+    start_left = TABLE_LEFT_IN
+
+    for index, (color, label) in enumerate(legend_items):
+        left = start_left + index * (item_width + gap)
         square = slide.shapes.add_shape(
             MSO_SHAPE.RECTANGLE,
-            Inches(square_left),
+            Inches(left),
             Inches(square_top),
-            Inches(0.21),
-            Inches(0.21),
+            Inches(0.22),
+            Inches(0.22),
         )
         square.fill.solid()
         square.fill.fore_color.rgb = color
         square.line.fill.background()
 
-        box = slide.shapes.add_textbox(Inches(text_left), Inches(6.35), Inches(2.6), Inches(0.29))
-        run = box.text_frame.paragraphs[0].add_run()
+        box = slide.shapes.add_textbox(
+            Inches(left + 0.3),
+            Inches(text_top),
+            Inches(item_width - 0.3),
+            Inches(0.34),
+        )
+        text_frame = box.text_frame
+        text_frame.word_wrap = True
+        text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
+        run = text_frame.paragraphs[0].add_run()
         run.text = label
         style_body_run(run)
 
@@ -480,18 +455,26 @@ def _add_impact_legend(slide):
 def _add_risks_slide(prs: Presentation, report_date: str):
     slide = _new_content_slide(prs, "Risks & Mitigation Plan", report_date, 10)
     headers = ["#", "Risk", "Impact", "Risk Mitigation / Contingency"]
-    rows = [["", "NA", "", ""]]
-    _add_table(slide, headers, rows, top=0.85, col_widths=[0.5, 3.5, 1.2, 3.5])
+    rows = [_empty_row(len(headers))]
+    risks_top = _add_table(slide, headers, rows, col_widths=[0.45, 4.4, 1.15, 4.6])
 
     issue_headers = ["#", "Issues", "Impact", "Contingency action"]
-    issue_rows = [["-", "-", "-", "-"]]
-    _add_table(slide, issue_headers, issue_rows, top=5.55, col_widths=[0.5, 3.5, 1.2, 3.5])
+    issue_rows = [_empty_row(len(issue_headers))]
+    issue_top = risks_top + min(0.34 * (len(rows) + 1), 5.8) + 0.35
+    _add_table(slide, issue_headers, issue_rows, top=issue_top, col_widths=[0.45, 4.4, 1.15, 4.6])
 
     _add_impact_legend(slide)
 
 
-def _add_planning_slide(prs: Presentation, report_date: str, qp: dict[str, int]):
+def _add_planning_slide(prs: Presentation, report_date: str, qp: dict[str, int] | None):
     slide = _new_content_slide(prs, "Quarterly Planning 2026-Non STLA", report_date, 11)
+
+    if qp is None:
+        note = slide.shapes.add_textbox(Inches(0.59), Inches(2.5), Inches(12.18), Inches(0.8))
+        note_run = note.text_frame.paragraphs[0].add_run()
+        note_run.text = "No quarterly planning data found in Book2.xlsx."
+        style_body_run(note_run)
+        return
 
     chart_data = CategoryChartData()
     chart_data.categories = ["Q3 Actual Available", f"{qp['planned_pct']}% of Q3 is Planned"]
@@ -639,20 +622,23 @@ def _add_closing_slide(
     _set_closing_footer(slide, report_date, 12)
 
 
-def _add_table(slide, headers, rows, top=1.0, col_widths=None):
+def _add_table(slide, headers, rows, top=None, col_widths=None) -> float:
+    if top is None:
+        top = content_top_below_title(slide)
+    fitted_widths = fit_table_column_widths(headers, col_widths)
     row_height = min(0.34 * (len(rows) + 1), 5.8)
     table_shape = slide.shapes.add_table(
         len(rows) + 1,
         len(headers),
-        Inches(0.25),
+        Inches(TABLE_LEFT_IN),
         Inches(top),
-        Inches(12.85),
+        Inches(TABLE_WIDTH_IN),
         Inches(row_height),
     )
     table = table_shape.table
-    if col_widths:
-        for idx, width in enumerate(col_widths):
-            table.columns[idx].width = Inches(width)
+    for idx, width in enumerate(fitted_widths):
+        table.columns[idx].width = Inches(width)
+    table.rows[0].height = Inches(TABLE_HEADER_ROW_HEIGHT_IN)
 
     for col_idx, header in enumerate(headers):
         table.cell(0, col_idx).text = header
@@ -662,6 +648,7 @@ def _add_table(slide, headers, rows, top=1.0, col_widths=None):
             table.cell(row_idx, col_idx).text = str(value)
 
     style_table_cells(table)
+    return top
 
 
 def generate_report(
@@ -698,11 +685,12 @@ def generate_report(
     tracker_rows = tracker_rows_lookup(tracker)
 
     eval_limit = graph_week_capacity(data_file, pending_week, "evaluation")
+    impl_limit = graph_week_capacity(data_file, pending_week, "implementation")
     eval_pending = pending_items(
         visibility, tracker_rows, mode="evaluation", pending_week=pending_week, limit=eval_limit
     )
     impl_pending = pending_items(
-        visibility, tracker_rows, mode="implementation", pending_week=pending_week, limit=2
+        visibility, tracker_rows, mode="implementation", pending_week=pending_week, limit=impl_limit
     )
     ddp_items = ddp_ms45_items(ddp, tracker_map)
     handoff_items = eval_handoff_items(planning, tracker_map, report_date)

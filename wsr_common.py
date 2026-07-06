@@ -348,11 +348,20 @@ def support_required_from_row(row: pd.Series) -> str:
 
 
 def load_non_stla_planning(data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
-    return pd.read_excel(data_file, sheet_name="Non_STLA (Planning)", header=2)
+    return pd.read_excel(data_file, sheet_name="Non_STLA (Planning)", header=1)
+
+
+def _planning_dcr_column(planning: pd.DataFrame) -> str | None:
+    for column in ("DCRID-PTC", planning.columns[1] if len(planning.columns) > 1 else None):
+        if column and column in planning.columns:
+            return column
+    return None
 
 
 def _planning_dcr_ids(planning: pd.DataFrame) -> list[int]:
-    dcr_col = planning.columns[1]
+    dcr_col = _planning_dcr_column(planning)
+    if dcr_col is None:
+        return []
     ids = []
     for value in planning[dcr_col]:
         dcr_id = parse_dcr_id(value)
@@ -362,11 +371,19 @@ def _planning_dcr_ids(planning: pd.DataFrame) -> list[int]:
 
 
 def planning_type_counts(planning: pd.DataFrame) -> dict[str, int]:
-    type_col = "Eval+Impl"
+    type_col = "Type" if "Type" in planning.columns else "Eval+Impl"
     if type_col not in planning.columns:
         return {}
     counts = planning[type_col].astype(str).str.strip().value_counts()
     return {str(key): int(value) for key, value in counts.items() if str(key) not in ("nan", "")}
+
+
+def _core2_planned_count(planning: pd.DataFrame) -> int | None:
+    if "Program" not in planning.columns:
+        return None
+    program = planning["Program"].astype(str).str.strip()
+    count = program.str.contains(r"\bDAF\b|Core\s*2", case=False, na=False).sum()
+    return int(count)
 
 
 def visibility_status_counts(visibility: pd.DataFrame) -> dict[str, dict[str, int]]:
@@ -415,7 +432,11 @@ def summary_callouts(data_file: str = DEFAULT_DATA_FILE) -> dict[str, str]:
             if impl_baseline is not None and impl_revised is not None
             else f"CSAR planned {total}"
         ),
-        "core2": "Core2 — see planning sheet",
+        "core2": (
+            f"Core2 {core2_count}"
+            if (core2_count := _core2_planned_count(planning)) is not None
+            else "-"
+        ),
         "ecm_testing": f"ECM Testing {type_counts.get('ECM_Testing', 0)}",
         "ddp_testing": f"DDP Testing {type_counts.get('DDP', 0)}",
         "eval_planned": (
@@ -650,61 +671,24 @@ def _report_month_year(report_date: str) -> tuple[int, int]:
     return parsed.month, parsed.year
 
 
-def _handoff_date_in_month(handoff_date: str, month: int, year: int) -> bool:
-    text = str(handoff_date).strip().lower()
-    if not text or text in ("-", "nan"):
-        return False
-    month_names = (
-        "january",
-        "february",
-        "march",
-        "april",
-        "may",
-        "june",
-        "july",
-        "august",
-        "september",
-        "october",
-        "november",
-        "december",
-    )
-    month_token = month_names[month - 1]
-    short_token = month_token[:3]
-    if short_token not in text and month_token not in text:
-        return False
-    if str(year) in text:
-        return True
-    return str(year)[-2:] in text
-
-
-# Handoff dates are not stored in the workbook; reference WSR rows below.
-REFERENCE_EVAL_HANDOFFS = [
-    {
-        "dcr_id": 19138223,
-        "evaluator": "Yue",
-        "handoff_date": "19 Jun 2026",
-        "remark": "",
-    },
-    {
-        "dcr_id": 19578849,
-        "evaluator": "Duygu",
-        "handoff_date": "19 Jun 2026",
-        "remark": "",
-    },
-    {
-        "dcr_id": 18922156,
-        "evaluator": "Duygu",
-        "handoff_date": "03 Jun 2026 >> 16 Jun 2026",
-        "remark": "Eval artifacts Received",
-    },
-]
-
-
 def _first_evaluator_name(value) -> str:
     if pd.isna(value) or str(value).strip() in ("", "nan"):
         return "-"
     text = str(value).strip()
     return text.split("/")[0].split(",")[0].strip()
+
+
+def _planning_handoff_date(row: pd.Series) -> tuple[pd.Timestamp | None, str]:
+    for column in (
+        "L2/DRB Eval Send dates\nDD-MM-YY",
+        "Eval completion date, (if it is evaluation)\nDD-MM-YY",
+    ):
+        if column not in row.index:
+            continue
+        parsed = pd.to_datetime(row.get(column), errors="coerce")
+        if pd.notna(parsed):
+            return parsed, format_date(parsed)
+    return None, "-"
 
 
 def eval_handoff_items(
@@ -713,26 +697,43 @@ def eval_handoff_items(
     report_date: str,
     limit: int = 10,
 ) -> list[dict]:
-    """Eval handoffs whose handoff date falls in the report month (e.g. June for a June WSR)."""
+    """Eval handoffs whose planning-sheet eval send/completion date falls in the report month."""
     month, year = _report_month_year(report_date)
+    dcr_col = _planning_dcr_column(planning)
+    if dcr_col is None:
+        return []
 
     items = []
-    for ref in REFERENCE_EVAL_HANDOFFS:
-        if not _handoff_date_in_month(ref["handoff_date"], month, year):
+    for _, row in planning.iterrows():
+        dcr_id = parse_dcr_id(row.get(dcr_col))
+        if dcr_id is None:
             continue
 
-        dcr_id = ref["dcr_id"]
+        handoff_ts, handoff_date = _planning_handoff_date(row)
+        if handoff_ts is None or handoff_ts.month != month or handoff_ts.year != year:
+            continue
+
         tracker_row = tracker_lookup_map.get(dcr_id)
-        summary = "-"
+        summary = str(row.get("Summary", "-")) if pd.notna(row.get("Summary")) else "-"
         if tracker_row is not None and pd.notna(tracker_row.get("Summary")):
             summary = str(tracker_row.get("Summary"))
+
+        evaluator = _first_evaluator_name(row.get("KPIT User"))
+        if evaluator == "-":
+            evaluator = _first_evaluator_name(row.get("Estimator"))
+
+        remark = "-"
+        if pd.notna(row.get("Remarks.1")) and str(row.get("Remarks.1")).strip() not in ("", "nan"):
+            remark = str(row.get("Remarks.1")).strip()
+        elif tracker_row is not None:
+            remark = latest_comment(tracker_row.get("Comments (Daily)"), max_len=None)
 
         items.append(
             {
                 "dcr_id": dcr_id,
-                "evaluator": ref["evaluator"],
-                "handoff_date": ref["handoff_date"],
-                "remark": ref["remark"] or "Eval handoff from onsite",
+                "evaluator": evaluator,
+                "handoff_date": handoff_date,
+                "remark": remark,
                 "summary": summary,
             }
         )
@@ -745,39 +746,8 @@ def discussion_points(
     visibility: pd.DataFrame,
     tracker_lookup_map: dict[int, pd.Series],
     limit: int = 5,
-    preferred_dcr_ids: list[int] | None = None,
 ) -> list[dict]:
     items = []
-    preferred_dcr_ids = preferred_dcr_ids or [18505556]
-
-    for dcr_id in preferred_dcr_ids:
-        tracker_row = tracker_lookup_map.get(dcr_id)
-        vis_row = _visibility_row(visibility, dcr_id)
-        if tracker_row is None and vis_row is None:
-            continue
-        tracker_row = tracker_row if tracker_row is not None else vis_row
-        priority = "High" if dcr_id == 18505556 else str(
-            tracker_row.get("CQ Priority", tracker_row.get("Internal Priority", "-"))
-        )
-        if not _is_high_priority(priority):
-            continue
-        items.append(
-            {
-                "dcr_id": dcr_id,
-                "description": str(tracker_row.get("Summary", "-")),
-                "program": "DAF" if dcr_id == 18505556 else (
-                    str(tracker_row.get("DCR Project", "CSAR"))
-                    if pd.notna(tracker_row.get("DCR Project"))
-                    else "CSAR"
-                ),
-                "priority": priority,
-                "plan_date": "Q3 Timelines" if dcr_id == 18505556 else format_date(
-                    tracker_row.get("Planned Completion Date\n<dd-mm-yyyy>")
-                ),
-                "remarks": latest_comment(tracker_row.get("Comments (Daily)"), max_len=None),
-            }
-        )
-
     at_risk = visibility[visibility["Status"].astype(str).str.contains("At Risk|On Hold", case=False, na=False)]
     for _, vis_row in at_risk.iterrows():
         dcr_raw = vis_row.get("DCR Number")

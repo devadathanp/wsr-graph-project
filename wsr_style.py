@@ -24,6 +24,14 @@ FONT_BODY = "Work Sans"
 
 TABLE_STYLE_ID = "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"
 
+SLIDE_WIDTH_IN = 13.333
+TABLE_MARGIN_IN = 0.4
+TABLE_WIDTH_IN = SLIDE_WIDTH_IN - (2 * TABLE_MARGIN_IN)
+TABLE_LEFT_IN = TABLE_MARGIN_IN
+TABLE_HEADER_ROW_HEIGHT_IN = 0.46
+TABLE_TOP_GAP_IN = 0.22
+TABLE_TOP_MIN_IN = 1.45
+
 TITLE_SIZE = Pt(32)
 TITLE_DATE_SIZE = Pt(14)
 SECTION_TITLE_SIZE = Pt(24)
@@ -174,6 +182,42 @@ def set_slide_title(slide, title: str, *, size=SECTION_TITLE_SIZE):
             set_run_font(run, size=size, bold=True, color=TEXT_DARK, name=FONT_MAJOR)
 
 
+def content_top_below_title(
+    slide,
+    *,
+    gap: float = TABLE_TOP_GAP_IN,
+    minimum: float = TABLE_TOP_MIN_IN,
+) -> float:
+    title_ph = find_placeholder(slide, idx=0) or find_placeholder(slide, name_contains="Title")
+    if title_ph is not None and title_ph.width.inches > 1.0:
+        bottom = title_ph.top.inches + title_ph.height.inches
+        return max(minimum, bottom + gap)
+    return minimum
+
+
+def min_header_column_width(header: str) -> float:
+    words = [word for word in str(header).split() if word]
+    if not words:
+        return 0.5
+    longest_word = max(len(word) for word in words)
+    return max(0.52, longest_word * 0.095)
+
+
+def fit_table_column_widths(headers: list[str], relative_widths: list[float] | None = None) -> list[float]:
+    if not headers:
+        return []
+    if not relative_widths:
+        relative_widths = [1.0] * len(headers)
+    mins = [min_header_column_width(header) for header in headers]
+    widths = [max(relative, minimum) for relative, minimum in zip(relative_widths, mins)]
+    total = sum(widths)
+    if total <= 0:
+        even = TABLE_WIDTH_IN / len(headers)
+        return [even] * len(headers)
+    scale = TABLE_WIDTH_IN / total
+    return [width * scale for width in widths]
+
+
 def apply_table_style(table) -> None:
     tbl = table._tbl
     tbl_pr = tbl.tblPr
@@ -201,7 +245,9 @@ def style_table_cells(table, *, header_rows: int = 1):
             cell.margin_bottom = Inches(0.02)
 
             is_header = row_idx < header_rows
-            for paragraph in cell.text_frame.paragraphs:
+            text_frame = cell.text_frame
+            text_frame.word_wrap = True
+            for paragraph in text_frame.paragraphs:
                 paragraph.alignment = PP_ALIGN.CENTER if is_header else PP_ALIGN.LEFT
                 if not paragraph.runs:
                     paragraph.text = paragraph.text or ""
