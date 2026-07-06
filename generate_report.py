@@ -48,16 +48,14 @@ from wsr_common import (
     get_implementation_data,
     graph_week_capacity,
     load_ddp_plan,
-    load_graph_summary,
     load_non_stla_planning,
     load_tracker,
     load_visibility,
     pending_items,
     pending_week_for_chart,
-    summary_callouts,
+    summary_table_rows,
     tracker_lookup,
     tracker_rows_lookup,
-    week_remarks,
 )
 from wsr_style import (
     CLOSING_HEADLINE_SIZE,
@@ -93,12 +91,29 @@ from wsr_style import (
     style_title_date_run,
     style_agenda_run,
     style_body_run,
+    raise_slide_title,
+    style_key_value_table,
     style_table_cells,
     style_title_run,
 )
 
 LAYOUT_OPENING = 13
 LAYOUT_CONTENT = 3
+
+DCR_CHART_LEFT = 0.08
+DCR_CHART_WIDTH = 9.72
+DCR_EVAL_TOP = 0.95
+DCR_CHART_HEIGHT = 3.2
+DCR_IMPL_TOP = 4.22
+DCR_PANEL_LEFT = 9.85
+DCR_PANEL_WIDTH = 3.2
+DCR_SUMMARY_TOP = 0.95
+DCR_NOTES_GAP = 0.12
+DCR_STATUS_NOTE_LINES = [
+    "The initial plan is based on high level estimations and DCRs in KPIT Pune team's bucket as on date.",
+    "Revised baseline plan is updated based on reshuffling done during execution in the quarter "
+    "based on DCR Rejections / moved to next quarter/ dependencies.",
+]
 
 AGENDA_ITEMS = [
     "MOM & Action Items",
@@ -237,61 +252,93 @@ def _add_mom_slide(prs: Presentation, report_date: str):
     _add_table(slide, headers, rows, col_widths=[0.6, 2.6, 1.7, 1.0, 0.95, 1.45, 3.0])
 
 
+def _add_summary_key_value_table(
+    slide,
+    rows: list[tuple[str, str]],
+    *,
+    left: float,
+    top: float,
+    width: float,
+) -> float:
+    row_height = 0.23
+    table_height = row_height * max(len(rows), 1)
+    table_shape = slide.shapes.add_table(
+        len(rows),
+        2,
+        Inches(left),
+        Inches(top),
+        Inches(width),
+        Inches(table_height),
+    )
+    table = table_shape.table
+    table.columns[0].width = Inches(width * 0.56)
+    table.columns[1].width = Inches(width * 0.44)
+    for row_idx, (label, value) in enumerate(rows):
+        table.cell(row_idx, 0).text = label
+        table.cell(row_idx, 1).text = str(value)
+    style_key_value_table(table)
+    return top + table_height
+
+
 def _add_dcr_status_slide(
     prs: Presentation,
     report_date: str,
     impl_chart: Path,
     eval_chart: Path,
-    summary: dict,
-    callouts: dict,
-    chart_week: int,
-    pending_week: int,
-    eval_data,
-    impl_data,
+    summary_rows: list[tuple[str, str]],
 ):
     slide = _new_content_slide(
         prs,
-        "DCR status Q3'26 – CSAR (Non-STLA)  & Core 2 program - PFS (Evaluation and Implementation)",
+        "PFS (Evaluation and Implementation)",
         report_date,
         4,
     )
+    raise_slide_title(slide)
 
-    slide.shapes.add_picture(str(impl_chart), Inches(0.12), Inches(1.05), width=Inches(6.45))
-    slide.shapes.add_picture(str(eval_chart), Inches(6.62), Inches(1.05), width=Inches(6.45))
+    slide.shapes.add_picture(
+        str(eval_chart),
+        Inches(DCR_CHART_LEFT),
+        Inches(DCR_EVAL_TOP),
+        width=Inches(DCR_CHART_WIDTH),
+        height=Inches(DCR_CHART_HEIGHT),
+    )
+    slide.shapes.add_picture(
+        str(impl_chart),
+        Inches(DCR_CHART_LEFT),
+        Inches(DCR_IMPL_TOP),
+        width=Inches(DCR_CHART_WIDTH),
+        height=Inches(DCR_CHART_HEIGHT),
+    )
 
-    callout = slide.shapes.add_textbox(Inches(0.2), Inches(4.7), Inches(6.2), Inches(2.1))
-    tf = callout.text_frame
-    tf.word_wrap = True
-    lines = [
-        f"Total DCR's planned: {callouts['total_planned']}",
-        f"{callouts['csar']} | {callouts['core2']} | "
-        f"{callouts['ecm_testing']} | {callouts['ddp_testing']}",
-        f"{callouts['eval_planned']} | {callouts['impl_planned']}",
-        f"{callouts['rejected']} | {callouts['deferred']}",
-        f"Data totals — Eval: {summary.get('eval_baseline')}/{summary.get('eval_revised')}/"
-        f"{summary.get('eval_completed')} | Impl: {summary.get('impl_baseline')}/"
-        f"{summary.get('impl_revised')}/{summary.get('impl_completed')}",
-    ]
-    for i, line in enumerate(lines):
-        para = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-        run = para.add_run()
-        run.text = line
-        set_run_font(run, size=Pt(8), color=TEXT_DARK, name=FONT_BODY)
+    table_bottom = _add_summary_key_value_table(
+        slide,
+        summary_rows,
+        left=DCR_PANEL_LEFT,
+        top=DCR_SUMMARY_TOP,
+        width=DCR_PANEL_WIDTH,
+    )
 
-    notes = slide.shapes.add_textbox(Inches(6.7), Inches(4.7), Inches(6.1), Inches(2.1))
-    ntf = notes.text_frame
-    ntf.word_wrap = True
-    note_lines = []
-    for week in (pending_week - 1, pending_week, chart_week):
-        from_data_eval = week_remarks(eval_data, week)
-        from_data_impl = week_remarks(impl_data, week)
-        if from_data_eval or from_data_impl:
-            note_lines.append(f"WK:{week} — Eval: {from_data_eval or '-'} | Impl: {from_data_impl or '-'}")
-    for i, line in enumerate(note_lines):
-        para = ntf.paragraphs[0] if i == 0 else ntf.add_paragraph()
-        run = para.add_run()
-        run.text = line
-        set_run_font(run, size=Pt(8), color=TEXT_MUTED, name=FONT_BODY)
+    notes_top = table_bottom + DCR_NOTES_GAP
+    notes = slide.shapes.add_textbox(
+        Inches(DCR_PANEL_LEFT),
+        Inches(notes_top),
+        Inches(DCR_PANEL_WIDTH),
+        Inches(7.45 - notes_top),
+    )
+    notes_tf = notes.text_frame
+    notes_tf.word_wrap = True
+    notes_tf.clear()
+
+    header = notes_tf.paragraphs[0]
+    header_run = header.add_run()
+    header_run.text = "# Note :"
+    set_run_font(header_run, size=Pt(10), bold=True, color=TEXT_DARK, name=FONT_BODY)
+
+    for index, line in enumerate(DCR_STATUS_NOTE_LINES, start=1):
+        paragraph = notes_tf.add_paragraph()
+        run = paragraph.add_run()
+        run.text = f"{index}. {line}"
+        set_run_font(run, size=Pt(7.5), color=TEXT_DARK, name=FONT_BODY)
 
 
 def _add_pending_slide(
@@ -673,8 +720,7 @@ def generate_report(
     impl_chart = save_implementation_chart(assets_dir / "implementation_chart.png", data_file=data_file)
     eval_chart = save_evaluation_chart(assets_dir / "evaluation_chart.png", data_file=data_file)
 
-    summary = load_graph_summary(data_file)
-    callouts = summary_callouts(data_file)
+    summary_rows = summary_table_rows(data_file)
     eval_data = get_evaluation_data(data_file=data_file)
     impl_data = get_implementation_data(data_file=data_file)
     tracker = load_tracker(data_file)
@@ -703,18 +749,7 @@ def generate_report(
     _add_title_slide(prs, report_date)
     _add_agenda_slide(prs, report_date)
     _add_mom_slide(prs, report_date)
-    _add_dcr_status_slide(
-        prs,
-        report_date,
-        impl_chart,
-        eval_chart,
-        summary,
-        callouts,
-        chart_week,
-        pending_week,
-        eval_data,
-        impl_data,
-    )
+    _add_dcr_status_slide(prs, report_date, impl_chart, eval_chart, summary_rows)
     _add_pending_slide(
         prs,
         f"Q3-2026 – Evaluations pending for closure for week {pending_week}",

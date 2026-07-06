@@ -9,6 +9,17 @@ import numpy as np
 
 from wsr_common import add_week_labels, get_evaluation_data, get_implementation_data, to_percentage
 
+# Reference WSR graph palette (slide 4).
+CHART_BASELINE = "#7ED321"
+CHART_REVISED = "#B8E986"
+CHART_COMPLETED = "#00B050"
+CHART_REJECTED = "#FFC000"
+CHART_IN_PROGRESS = "#FFFF00"
+CHART_DRB = "#00B0F0"
+CHART_CONFIDENCE = "#8064A2"
+CHART_ACTUAL = "#7030A0"
+DRB_COLUMN = "DRB /l2 Reviews & Rework  in progress"
+
 
 def _plot_section(
     section,
@@ -17,85 +28,131 @@ def _plot_section(
     progress_col: str,
     progress_label: str,
     output_path: str | Path,
-    figsize=(16, 8),
+    figsize=(11.5, 4.05),
 ) -> Path:
     section = add_week_labels(section)
     x = np.arange(len(section))
-    bar_width = 0.12
+    bar_width = 0.11
+    offsets = (-2.5, -1.5, -0.5, 0.5, 1.5, 2.5)
 
     fig, ax1 = plt.subplots(figsize=figsize)
 
-    bars1 = ax1.bar(
-        x - 2 * bar_width,
-        section["Cumulative (Baseline Plan)"],
-        width=bar_width,
-        color="#7ED321",
-        label="Cumulative (Baseline Plan)",
-    )
-    bars2 = ax1.bar(
-        x - bar_width,
-        section["Cumulative Revised basline plan"],
-        width=bar_width,
-        color="#B8E986",
-        label="Cumulative Revised baseline plan",
-    )
-    bars3 = ax1.bar(
-        x,
-        section["Cumulative (Completed)"],
-        width=bar_width,
-        color="#00B050",
-        label="Cumulative (Completed)",
-    )
-    bars4 = ax1.bar(
-        x + bar_width,
-        section["Cumulative Rejected / Transferred/ Moved to next quarter"],
-        width=bar_width,
-        color="#F4B400",
-        label="Rejected/Transferred",
-    )
-    bars5 = ax1.bar(
-        x + 2 * bar_width,
-        section[progress_col],
-        width=bar_width,
-        color="#FFF000",
-        label=progress_label,
-    )
+    bar_specs = [
+        (offsets[0], "Cumulative (Baseline Plan)", CHART_BASELINE, "Cumulative (Baseline Plan)"),
+        (offsets[1], "Cumulative Revised basline plan", CHART_REVISED, "Cumulative Revised baseline plan"),
+        (offsets[2], "Cumulative (Completed)", CHART_COMPLETED, "Cumulative (Completed)"),
+        (
+            offsets[3],
+            "Cumulative Rejected / Transferred/ Moved to next quarter",
+            CHART_REJECTED,
+            "Rejected / Transferred / Moved to next quarter",
+        ),
+        (offsets[4], progress_col, CHART_IN_PROGRESS, progress_label),
+        (offsets[5], DRB_COLUMN, CHART_DRB, "DRB / L2 Reviews & Rework in progress"),
+    ]
+
+    bars_groups = []
+    for offset, column, color, label in bar_specs:
+        values = section[column] if column in section.columns else [0] * len(section)
+        bars = ax1.bar(
+            x + offset * bar_width,
+            values,
+            width=bar_width,
+            color=color,
+            label=label,
+        )
+        bars_groups.append(bars)
 
     ax2 = ax1.twinx()
     confidence = to_percentage(section["% Completion Confidence - Overall"])
     actual = to_percentage(section["% Actual weekly completion wr.t  revised Baseline"])
 
-    ax2.plot(x, confidence, color="black", linewidth=3, label="% Completion Confidence")
-    ax2.plot(x, actual, color="#7030A0", linewidth=3, label="% Actual weekly completion")
+    ax2.plot(
+        x,
+        confidence,
+        color=CHART_CONFIDENCE,
+        linewidth=2.5,
+        label="% Completion Confidence - Overall",
+    )
+    ax2.plot(
+        x,
+        actual,
+        color=CHART_ACTUAL,
+        linewidth=2.5,
+        label="% Actual weekly completion w.r.t revised Baseline",
+    )
 
-    for bars in [bars1, bars2, bars3, bars4, bars5]:
+    bar_max = 0.0
+    for bars in bars_groups:
+        for bar in bars:
+            height = bar.get_height()
+            if not np.isnan(height):
+                bar_max = max(bar_max, height)
+
+    lane_spacing = 3.4
+    lane_base = bar_max + 3.0
+    label_ceiling = lane_base + lane_spacing * (len(bars_groups) - 1) + 2.0
+    ax1.set_ylim(0, label_ceiling)
+
+    for group_idx, bars in enumerate(bars_groups):
+        lane_y = lane_base + group_idx * lane_spacing
         for bar in bars:
             height = bar.get_height()
             if not np.isnan(height) and height > 0:
+                bar_x = bar.get_x() + bar.get_width() / 2
+                if height < lane_y - 1.5:
+                    ax1.plot(
+                        [bar_x, bar_x],
+                        [height + 0.4, lane_y - 0.35],
+                        color="#666666",
+                        linewidth=0.45,
+                        alpha=0.55,
+                        zorder=1,
+                    )
                 ax1.text(
-                    bar.get_x() + bar.get_width() / 2,
-                    height,
+                    bar_x,
+                    lane_y,
                     f"{int(height)}",
                     ha="center",
                     va="bottom",
-                    fontsize=9,
+                    fontsize=6.5,
+                    zorder=2,
+                    clip_on=False,
                 )
 
-    for i, value in enumerate(confidence):
+    for index, value in enumerate(confidence):
         if not np.isnan(value):
-            ax2.text(i, value + 2, f"{int(value)}%", ha="center", fontsize=10, color="black")
+            ax2.text(
+                index + 0.38,
+                min(value + 6, 118),
+                f"{int(value)}%",
+                ha="left",
+                va="bottom",
+                fontsize=7,
+                color=CHART_CONFIDENCE,
+                clip_on=False,
+            )
 
-    for i, value in enumerate(actual):
+    for index, value in enumerate(actual):
         if not np.isnan(value):
-            ax2.text(i, value - 8, f"{int(value)}%", ha="center", fontsize=10, color="#7030A0")
+            ax2.text(
+                index + 0.38,
+                max(value - 8, 2),
+                f"{int(value)}%",
+                ha="left",
+                va="top",
+                fontsize=7,
+                color=CHART_ACTUAL,
+                clip_on=False,
+            )
 
-    ax1.set_title(title, fontsize=20, fontweight="bold")
+    ax1.set_title(title, fontsize=15, fontweight="bold", pad=8)
     ax1.set_xticks(x)
-    ax1.set_xticklabels(section["Week Label"])
-    ax1.set_ylabel("DCR Count")
-    ax2.set_ylabel("Percentage")
+    ax1.set_xticklabels(section["Week Label"], fontsize=9)
+    ax1.set_ylabel("DCR Count", fontsize=10)
+    ax2.set_ylabel("Percentage", fontsize=10)
     ax2.set_ylim(0, 120)
-    ax1.grid(axis="y", linestyle="--", alpha=0.4)
+    ax1.grid(axis="y", linestyle="--", alpha=0.35)
 
     handles1, labels1 = ax1.get_legend_handles_labels()
     handles2, labels2 = ax2.get_legend_handles_labels()
@@ -103,13 +160,15 @@ def _plot_section(
         handles1 + handles2,
         labels1 + labels2,
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.12),
-        ncol=3,
+        bbox_to_anchor=(0.5, -0.22),
+        ncol=2,
+        fontsize=7,
+        frameon=False,
     )
 
-    plt.tight_layout()
+    plt.tight_layout(rect=(0, 0.06, 1, 0.98))
     output_path = Path(output_path)
-    plt.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.savefig(output_path, dpi=220, bbox_inches="tight")
     plt.close(fig)
     return output_path
 

@@ -18,6 +18,7 @@ ACCENT_LIME = RGBColor(0xB0, 0xFF, 0x45)      # accent1
 TEXT_DARK = RGBColor(0x16, 0x17, 0x18)       # dk1
 TEXT_MUTED = RGBColor(0x4D, 0x51, 0x54)      # dk2
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
+SUMMARY_TABLE_FILL = RGBColor(0xC6, 0xE0, 0xB4)
 
 FONT_MAJOR = "Work Sans Medium"
 FONT_BODY = "Work Sans"
@@ -193,6 +194,47 @@ def content_top_below_title(
         bottom = title_ph.top.inches + title_ph.height.inches
         return max(minimum, bottom + gap)
     return minimum
+
+
+def raise_slide_title(slide, top_in: float = 0.42) -> None:
+    title_ph = find_placeholder(slide, idx=0) or find_placeholder(slide, name_contains="Title")
+    if title_ph is not None:
+        left = title_ph.left
+        width = title_ph.width
+        height = title_ph.height
+        title_ph.top = Inches(top_in)
+        title_ph.left = left
+        title_ph.width = width
+        title_ph.height = height
+
+
+def style_key_value_table(table) -> None:
+    apply_table_style(table)
+    for row_idx in range(len(table.rows)):
+        for col_idx in range(len(table.columns)):
+            cell = table.cell(row_idx, col_idx)
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = SUMMARY_TABLE_FILL
+            cell.vertical_anchor = MSO_ANCHOR.MIDDLE
+            cell.margin_left = Inches(0.05)
+            cell.margin_right = Inches(0.05)
+            cell.margin_top = Inches(0.02)
+            cell.margin_bottom = Inches(0.02)
+            is_label = col_idx == 0
+            for paragraph in cell.text_frame.paragraphs:
+                paragraph.alignment = PP_ALIGN.LEFT
+                if not paragraph.runs:
+                    paragraph.text = paragraph.text or ""
+                for run in paragraph.runs:
+                    set_run_font(
+                        run,
+                        size=Pt(9) if is_label else Pt(9.5),
+                        bold=is_label,
+                        color=TEXT_DARK,
+                        name=FONT_BODY,
+                    )
+                    if is_label:
+                        run.font.bold = True
 
 
 def min_header_column_width(header: str) -> float:

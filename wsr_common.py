@@ -781,6 +781,78 @@ def discussion_points(
     return items
 
 
+def summary_table_rows(data_file: str = DEFAULT_DATA_FILE) -> list[tuple[str, str]]:
+    """Two-column DCR status summary for slide 4 (values sourced from workbooks)."""
+    planning = load_non_stla_planning(data_file)
+    type_counts = planning_type_counts(planning)
+    status_counts = visibility_status_counts(load_visibility(data_file))
+    graph = load_graph_summary(data_file)
+
+    eval_baseline = graph.get("eval_baseline")
+    eval_revised = graph.get("eval_revised")
+    impl_baseline = graph.get("impl_baseline")
+    impl_revised = graph.get("impl_revised")
+
+    if None not in (eval_baseline, eval_revised, impl_baseline, impl_revised):
+        total_value = (
+            f"{eval_baseline + impl_baseline} >> {eval_revised + impl_revised} "
+            "(Non STLA + Core 2) + ECM Testing"
+        )
+    else:
+        total_value = f"{len(set(_planning_dcr_ids(planning)))} (Non STLA + Core 2) + ECM Testing"
+
+    csar_value = (
+        f"{impl_baseline} >> {impl_revised}"
+        if impl_baseline is not None and impl_revised is not None
+        else "-"
+    )
+    core2_count = _core2_planned_count(planning)
+    eval_planned = (
+        f"{eval_baseline} >> {eval_revised}"
+        if eval_baseline is not None and eval_revised is not None
+        else str(type_counts.get("Eval+Impl", 0) + type_counts.get("Eval", 0))
+    )
+    impl_planned = (
+        f"{impl_baseline} >> {impl_revised}"
+        if impl_baseline is not None and impl_revised is not None
+        else str(type_counts.get("Impl", 0) + type_counts.get("Eval+Impl", 0))
+    )
+
+    return [
+        ("Total DCR's planned", total_value),
+        ("CSAR", csar_value),
+        ("Core2", str(core2_count) if core2_count is not None else "-"),
+        ("ECM Testing", str(type_counts.get("ECM_Testing", 0))),
+        ("DDP Testing", str(type_counts.get("DDP", 0))),
+        ("DCR's Planned for Evaluation", eval_planned),
+        ("DCR's Planned for Implementation", impl_planned),
+        (
+            "DCR's Rejected",
+            f"Eval: {status_counts['rejected']['eval']:02d}, "
+            f"Impl: {status_counts['rejected']['impl']:02d}",
+        ),
+        (
+            "DCR's Deferred",
+            f"Eval: {status_counts['deferred']['eval']:02d}, "
+            f"Impl: {status_counts['deferred']['impl']:02d}",
+        ),
+    ]
+
+
+def graph_status_notes(
+    eval_data: pd.DataFrame,
+    impl_data: pd.DataFrame,
+    weeks: list[int],
+) -> list[str]:
+    lines = []
+    for week in weeks:
+        eval_note = week_remarks(eval_data, week)
+        impl_note = week_remarks(impl_data, week)
+        if eval_note or impl_note:
+            lines.append(f"WK:{week} — Eval: {eval_note or '-'} | Impl: {impl_note or '-'}")
+    return lines
+
+
 def week_remarks(section: pd.DataFrame, week_no: int) -> str:
     match = section[section["Week No"] == week_no]
     if match.empty:
