@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pandas as pd
 
@@ -98,19 +100,49 @@ def load_ddp_plan(data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
     return pd.read_excel(data_file, sheet_name=DDP_SHEET)
 
 
+def parse_dcr_id(value) -> int | None:
+    if pd.isna(value):
+        return None
+    try:
+        return int(float(str(value).strip().split("\n")[0].strip()))
+    except (TypeError, ValueError):
+        return None
+
+
 def tracker_lookup(tracker: pd.DataFrame) -> dict[int, pd.Series]:
-    lookup = {}
+    """Most recently seen Non STLA row per DCR (backward compatible)."""
+    return {dcr_id: rows[-1] for dcr_id, rows in tracker_rows_lookup(tracker).items()}
+
+
+def tracker_rows_lookup(tracker: pd.DataFrame) -> dict[int, list[pd.Series]]:
+    lookup: dict[int, list[pd.Series]] = {}
     id_col = "DCR ID - PTC"
     for _, row in tracker.iterrows():
-        dcr_id = row.get(id_col)
-        if pd.isna(dcr_id):
+        dcr_id = parse_dcr_id(row.get(id_col))
+        if dcr_id is None:
             continue
-        dcr_text = str(dcr_id).strip().split("\n")[0].strip()
-        try:
-            lookup[int(float(dcr_text))] = row
-        except (TypeError, ValueError):
-            continue
+        lookup.setdefault(dcr_id, []).append(row)
     return lookup
+
+
+def _tracker_row_for_mode(
+    tracker_rows: dict[int, list[pd.Series]],
+    dcr_id: int,
+    mode: str,
+) -> pd.Series | None:
+    rows = tracker_rows.get(dcr_id, [])
+    if not rows:
+        return None
+    if mode == "evaluation":
+        for row in rows:
+            if "Eval" in str(row.get("PRCRState", "")):
+                return row
+    else:
+        for row in rows:
+            state = str(row.get("PRCRState", ""))
+            if "Impl" in state and "Eval" not in state:
+                return row
+    return rows[-1]
 
 
 def format_date(value) -> str:
@@ -184,18 +216,123 @@ def impl_status_from_row(row: pd.Series) -> str:
     return "In Progress"
 
 
-def closure_date_from_row(row: pd.Series, fallback: str = "-") -> str:
-    planned = row.get("Planned Completion Date\n<dd-mm-yyyy>")
-    if pd.notna(planned) and str(planned).strip() not in ("", "0", "nan"):
-        formatted = format_date(planned)
-        if formatted != "-":
-            return formatted
+def _coerce_tracker_date(value, default_year: int = 2026) -> pd.Timestamp | None:
+    if pd.isna(value) or value in (0, "0"):
+        return None
+    if isinstance(value, pd.Timestamp):
+        if value.year < 1990:
+            return None
+        return value
+    text = str(value).strip()
+    if not text or text.lower() in ("nan", "nat", "00:00:00"):
+        return None
+    try:
+        parsed = pd.to_datetime(value, dayfirst=True, errors="coerce")
+    except (TypeError, ValueError):
+        return None
+    if pd.isna(parsed) or parsed.year < 1990:
+        return None
+    if parsed.year == 1900 and default_year:
+        parsed = parsed.replace(year=default_year)
+    return parsed
 
-    comments = str(row.get("Comments (Daily)", ""))
-    for token in ("25th June", "23rd June", "22/06/2026", "19th June", "18th June"):
-        if token.lower() in comments.lower():
-            return token
+
+def _dates_from_comments(comments, default_year: int = 2026) -> list[pd.Timestamp]:
+    if pd.isna(comments):
+        return []
+    text = str(comments)
+    found: list[pd.Timestamp] = []
+
+    month_map = {
+        "jan": 1,
+        "feb": 2,
+        "mar": 3,
+        "apr": 4,
+        "may": 5,
+        "jun": 6,
+        "jul": 7,
+        "aug": 8,
+        "sep": 9,
+        "oct": 10,
+        "nov": 11,
+        "dec": 12,
+    }
+
+    for match in re.finditer(
+        r"(\d{1,2})(?:st|nd|rd|th)?\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*(?:\s+(\d{4}))?",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        day = int(match.group(1))
+        month = month_map[match.group(2).lower()[:3]]
+        year = int(match.group(3)) if match.group(3) else default_year
+        found.append(pd.Timestamp(year=year, month=month, day=day))
+
+    for match in re.finditer(r"(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?", text):
+        day = int(match.group(1))
+        month = int(match.group(2))
+        year_raw = match.group(3)
+        if year_raw:
+            year = int(year_raw)
+            if year < 100:
+                year += 2000
+        else:
+            year = default_year
+        try:
+            found.append(pd.Timestamp(year=year, month=month, day=day))
+        except ValueError:
+            continue
+
+    return found
+
+
+def closure_date_from_row(
+    row: pd.Series,
+    vis_row: pd.Series | None = None,
+    fallback: str = "-",
+    default_year: int = 2026,
+) -> str:
+    candidates: list[pd.Timestamp] = []
+    date_columns = [
+        "Planned Completion Date\n<dd-mm-yyyy>",
+        "Deadline Date as per tagged phase/ Commit Date",
+        "DRB/L2\nPlanned date3",
+        "PEER \nPlanned date",
+        "CCB\nPlanned date2",
+        "OBD FORUM\nPLANNED DATE",
+        "Support Required by date",
+        "Expected completion Dt? (if Delayed)",
+    ]
+    for column in date_columns:
+        parsed = _coerce_tracker_date(row.get(column), default_year=default_year)
+        if parsed is not None:
+            candidates.append(parsed)
+
+    if vis_row is not None:
+        for column in ("Planned End Date", "Planned Start Date"):
+            parsed = _coerce_tracker_date(vis_row.get(column), default_year=default_year)
+            if parsed is not None and parsed.year >= 1990:
+                candidates.append(parsed)
+
+    latest_line = latest_comment(row.get("Comments (Daily)"), max_len=None)
+    comment_dates = _dates_from_comments(latest_line, default_year=default_year)
+    if comment_dates:
+        return format_date(max(comment_dates))
+
+    if candidates:
+        return format_date(min(candidates))
+
     return fallback
+
+
+def closure_sort_key(closure_date: str) -> tuple[int, pd.Timestamp]:
+    text = str(closure_date).strip()
+    if not text or text in ("-", "nan"):
+        return (1, pd.Timestamp.max)
+    parsed = pd.to_datetime(text, dayfirst=True, errors="coerce")
+    if pd.isna(parsed):
+        return (1, pd.Timestamp.max)
+    return (0, parsed)
 
 
 def support_required_from_row(row: pd.Series) -> str:
@@ -210,16 +347,94 @@ def support_required_from_row(row: pd.Series) -> str:
     return "-"
 
 
-# TODO hardcoded — weekly snapshot used when tracker no longer reflects report-week state.
-REFERENCE_PENDING_EVAL_BY_WEEK: dict[int, list[int]] = {
-    24: [
-        19553713, 19656622, 19577109, 18802806, 19515992, 18802857,
-        17803153, 18815112, 19538930, 19657044, 19392732, 18795425,
-    ],
-}
-REFERENCE_PENDING_IMPL_BY_WEEK: dict[int, list[int]] = {
-    24: [17625104, 17625100],
-}
+def load_non_stla_planning(data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
+    return pd.read_excel(data_file, sheet_name="Non_STLA (Planning)", header=2)
+
+
+def _planning_dcr_ids(planning: pd.DataFrame) -> list[int]:
+    dcr_col = planning.columns[1]
+    ids = []
+    for value in planning[dcr_col]:
+        dcr_id = parse_dcr_id(value)
+        if dcr_id is not None:
+            ids.append(dcr_id)
+    return ids
+
+
+def planning_type_counts(planning: pd.DataFrame) -> dict[str, int]:
+    type_col = "Eval+Impl"
+    if type_col not in planning.columns:
+        return {}
+    counts = planning[type_col].astype(str).str.strip().value_counts()
+    return {str(key): int(value) for key, value in counts.items() if str(key) not in ("nan", "")}
+
+
+def visibility_status_counts(visibility: pd.DataFrame) -> dict[str, dict[str, int]]:
+    rejected = visibility[visibility["Status"].astype(str).str.contains("Reject", case=False, na=False)]
+    deferred = visibility[visibility["Status"].astype(str).str.contains("Defer", case=False, na=False)]
+
+    def _split_eval_impl(frame: pd.DataFrame) -> dict[str, int]:
+        eval_count = 0
+        impl_count = 0
+        for _, row in frame.iterrows():
+            work_type = str(row.get("Evaluation/ Implementation", ""))
+            if "Eval" in work_type:
+                eval_count += 1
+            elif "Impl" in work_type:
+                impl_count += 1
+        return {"eval": eval_count, "impl": impl_count}
+
+    return {
+        "rejected": _split_eval_impl(rejected),
+        "deferred": _split_eval_impl(deferred),
+    }
+
+
+def summary_callouts(data_file: str = DEFAULT_DATA_FILE) -> dict[str, str]:
+    """Build DCR status summary callout text from planning, graph, and visibility sheets."""
+    planning = load_non_stla_planning(data_file)
+    visibility = load_visibility(data_file)
+    graph = load_graph_summary(data_file)
+    type_counts = planning_type_counts(planning)
+    status_counts = visibility_status_counts(visibility)
+
+    planned_ids = _planning_dcr_ids(planning)
+    total = len(set(planned_ids))
+    eval_impl = type_counts.get("Eval+Impl", 0)
+    impl_only = type_counts.get("Impl", 0)
+
+    eval_baseline = graph.get("eval_baseline")
+    eval_revised = graph.get("eval_revised")
+    impl_baseline = graph.get("impl_baseline")
+    impl_revised = graph.get("impl_revised")
+
+    return {
+        "total_planned": f"{total} (Non STLA + Core 2) + ECM Testing",
+        "csar": (
+            f"CSAR {impl_baseline} >> {impl_revised}"
+            if impl_baseline is not None and impl_revised is not None
+            else f"CSAR planned {total}"
+        ),
+        "core2": "Core2 — see planning sheet",
+        "ecm_testing": f"ECM Testing {type_counts.get('ECM_Testing', 0)}",
+        "ddp_testing": f"DDP Testing {type_counts.get('DDP', 0)}",
+        "eval_planned": (
+            f"DCR's Planned for Evaluation {eval_baseline} >> {eval_revised}"
+            if eval_baseline is not None and eval_revised is not None
+            else f"DCR's Planned for Evaluation {eval_impl + type_counts.get('Eval', 0)}"
+        ),
+        "impl_planned": (
+            f"DCR's Planned for Implementation {impl_baseline} >> {impl_revised}"
+            if impl_baseline is not None and impl_revised is not None
+            else f"DCR's Planned for Implementation {impl_only + eval_impl}"
+        ),
+        "rejected": (
+            "DCR's Rejected — Eval: {eval:02d}, Impl: {impl:02d}".format(**status_counts["rejected"])
+        ),
+        "deferred": (
+            "DCR's Deferred — Eval: {eval:02d}, Impl: {impl:02d}".format(**status_counts["deferred"])
+        ),
+    }
 
 
 def _visibility_row(visibility: pd.DataFrame, dcr_id: int) -> pd.Series | None:
@@ -231,11 +446,11 @@ def _visibility_row(visibility: pd.DataFrame, dcr_id: int) -> pd.Series | None:
 
 def _build_pending_item(
     dcr_id: int,
-    tracker_lookup_map: dict[int, pd.Series],
+    tracker_rows: dict[int, list[pd.Series]],
     visibility: pd.DataFrame,
     mode: str,
 ) -> dict | None:
-    tracker_row = tracker_lookup_map.get(dcr_id)
+    tracker_row = _tracker_row_for_mode(tracker_rows, dcr_id, mode)
     if tracker_row is None:
         return None
     vis_row = _visibility_row(visibility, dcr_id)
@@ -246,7 +461,7 @@ def _build_pending_item(
             "dcr_id": dcr_id,
             "summary": str(summary) if pd.notna(summary) else "-",
             "status": eval_status_from_row(tracker_row),
-            "closure_date": closure_date_from_row(tracker_row),
+            "closure_date": closure_date_from_row(tracker_row, vis_row),
             "support": support_required_from_row(tracker_row),
             "remarks": latest_comment(tracker_row.get("Comments (Daily)"), max_len=None),
         }
@@ -260,21 +475,13 @@ def _build_pending_item(
 
 def pending_items(
     visibility: pd.DataFrame,
-    tracker_lookup_map: dict[int, pd.Series],
+    tracker_rows: dict[int, list[pd.Series]],
     mode: str,
     pending_week: int | None = None,
     limit: int = 12,
 ) -> list[dict]:
+    del pending_week  # week label is applied on the slide; rows come from current workbook state.
     mode = mode.lower()
-    reference_map = REFERENCE_PENDING_EVAL_BY_WEEK if mode == "evaluation" else REFERENCE_PENDING_IMPL_BY_WEEK
-    if pending_week is not None and pending_week in reference_map:
-        items = []
-        for dcr_id in reference_map[pending_week][:limit]:
-            item = _build_pending_item(dcr_id, tracker_lookup_map, visibility, mode)
-            if item is not None:
-                items.append(item)
-        if items:
-            return items
 
     if mode == "evaluation":
         type_mask = visibility["Evaluation/ Implementation"].astype(str).str.contains("Eval", case=False, na=False)
@@ -282,20 +489,16 @@ def pending_items(
         type_mask = visibility["Evaluation/ Implementation"].astype(str).str.contains("Impl", case=False, na=False)
 
     excluded_status = visibility["Status"].astype(str).str.contains(
-        "Rejected|Cancelled|Deferred", case=False, na=False
+        r"Rejected|Cancelled|Deferred|Closed", case=False, na=False
     )
 
-    candidates: list[tuple[int, int, int]] = []
+    candidates: list[tuple[int, int]] = []
     for _, vis_row in visibility[type_mask & ~excluded_status].iterrows():
-        dcr_raw = vis_row.get("DCR Number")
-        if pd.isna(dcr_raw):
-            continue
-        try:
-            dcr_id = int(dcr_raw)
-        except (TypeError, ValueError):
+        dcr_id = parse_dcr_id(vis_row.get("DCR Number"))
+        if dcr_id is None:
             continue
 
-        tracker_row = tracker_lookup_map.get(dcr_id)
+        tracker_row = _tracker_row_for_mode(tracker_rows, dcr_id, mode)
         if tracker_row is None:
             continue
         if pd.notna(tracker_row.get("Actual Cmpln Date\n<dd-mm-yyyy>")):
@@ -318,12 +521,12 @@ def pending_items(
             if str(tracker_row.get("PRCR Stage", "")) in ("Verify", "Submit", "Assess", "In Progress"):
                 score += 2
 
-        candidates.append((score, dcr_id, dcr_id))
+        candidates.append((score, dcr_id))
 
     candidates.sort(key=lambda item: (-item[0], item[1]))
-    selected_ids = []
-    seen = set()
-    for _, dcr_id, _ in candidates:
+    selected_ids: list[int] = []
+    seen: set[int] = set()
+    for _, dcr_id in candidates:
         if dcr_id in seen:
             continue
         seen.add(dcr_id)
@@ -331,20 +534,14 @@ def pending_items(
         if len(selected_ids) >= limit:
             break
 
-    if mode == "implementation" and limit <= 3:
-        pair = {17625104, 17625100}
-        if pair & set(selected_ids) and not pair.issubset(selected_ids):
-            missing = list(pair - set(selected_ids))[0]
-            if missing in {d for _, d, _ in candidates}:
-                if len(selected_ids) >= limit:
-                    selected_ids = selected_ids[: limit - 1]
-                selected_ids.append(missing)
-
     items = []
     for dcr_id in selected_ids:
-        item = _build_pending_item(dcr_id, tracker_lookup_map, visibility, mode)
+        item = _build_pending_item(dcr_id, tracker_rows, visibility, mode)
         if item is not None:
             items.append(item)
+
+    if mode == "evaluation":
+        items.sort(key=lambda item: closure_sort_key(item["closure_date"]))
 
     return items
 
@@ -369,16 +566,53 @@ def graph_week_capacity(data_file: str, pending_week: int, mode: str) -> int:
     return max(1, min(int(value), 12))
 
 
-# DCR IDs from reference PDF — used when DDP_Plan row is sparse; enriched from tracker/planning.
-REFERENCE_DDP_DCR_IDS = [
-    19734138,
-    17151985,
-    17808035,
-    16826540,
-    19469754,
-    15194636,
-    15194642,
-]
+def _ddp_row_item(
+    ddp_row: pd.Series,
+    tracker_lookup_map: dict[int, pd.Series],
+    sr_no: int,
+) -> dict:
+    dcr_no = ddp_row.get("DCR No")
+    dcr_text = "-" if pd.isna(dcr_no) else str(dcr_no).replace(".0", "").strip()
+    dcr_id = parse_dcr_id(dcr_no)
+    tracker_row = tracker_lookup_map.get(dcr_id) if dcr_id is not None else None
+
+    if pd.notna(ddp_row.get("Diagnostics Name")):
+        summary = str(ddp_row.get("Diagnostics Name"))
+    elif tracker_row is not None:
+        summary = str(tracker_row.get("Summary", "-"))
+    else:
+        summary = "-"
+
+    remarks = ddp_row.get("Current status", ddp_row.get("Status", "-"))
+    if pd.isna(remarks) or str(remarks).strip() in ("", "nan"):
+        remarks = (
+            latest_comment(tracker_row.get("Comments (Daily)"), max_len=200)
+            if tracker_row is not None
+            else "-"
+        )
+
+    dependencies = "-"
+    if tracker_row is not None:
+        for field in (
+            "Support Required from team",
+            "Reasons for delay",
+            "Mitigation Plan",
+        ):
+            value = tracker_row.get(field)
+            if pd.notna(value) and str(value).strip() not in ("", "nan", "0"):
+                dependencies = str(value).strip().replace("\n", " ")
+                break
+
+    return {
+        "sr_no": sr_no,
+        "dcr_id": dcr_text,
+        "summary": summary,
+        "plan_date": format_date(ddp_row.get("Revised planned dates", ddp_row.get("Appeared Plan date"))),
+        "appeared_date": format_date(ddp_row.get("Appeared Plan date")),
+        "program": str(ddp_row.get("Bench Type", "-")) if pd.notna(ddp_row.get("Bench Type")) else "-",
+        "dependencies": dependencies,
+        "remarks": str(remarks),
+    }
 
 
 def ddp_ms45_items(
@@ -386,59 +620,120 @@ def ddp_ms45_items(
     tracker_lookup_map: dict[int, pd.Series],
     limit: int = 7,
 ) -> list[dict]:
+    rows = ddp[ddp["DCR No"].notna()].copy()
+    rows = rows[~rows["DCR No"].astype(str).str.strip().str.upper().eq("TBD")]
+    rows["_ms45"] = rows["Status"].astype(str).str.contains(r"MS\s*4|4-5|4_5", case=False, na=False)
+    rows["_has_diag"] = rows["Diagnostics Name"].notna()
+    rows = rows.sort_values(by=["_ms45", "_has_diag"], ascending=[False, False])
+
     items = []
-
-    for dcr_id in REFERENCE_DDP_DCR_IDS:
-        tracker_row = tracker_lookup_map.get(dcr_id)
-        ddp_row = ddp[ddp["DCR No"].astype(str).str.contains(str(dcr_id), na=False)]
-        ddp_row = ddp_row.iloc[0] if not ddp_row.empty else None
-
-        if ddp_row is not None and pd.notna(ddp_row.get("Diagnostics Name")):
-            summary = str(ddp_row.get("Diagnostics Name"))
-            plan_date = format_date(ddp_row.get("Revised planned dates", ddp_row.get("Appeared Plan date")))
-            appeared = format_date(ddp_row.get("Appeared Plan date"))
-            program = str(ddp_row.get("Bench Type", "-")) if pd.notna(ddp_row.get("Bench Type")) else "-"
-            remarks = str(ddp_row.get("Current status", ddp_row.get("Status", "-")))
-        elif tracker_row is not None:
-            summary = str(tracker_row.get("Summary", "-"))
-            plan_date = format_date(tracker_row.get("Planned Completion Date\n<dd-mm-yyyy>"))
-            appeared = "-"
-            program = str(tracker_row.get("DCR Project", "CSAR")) if pd.notna(tracker_row.get("DCR Project")) else "CSAR"
-            remarks = latest_comment(tracker_row.get("Comments (Daily)"), max_len=200)
-        else:
-            summary = f"DDP work (MS4-5) — DCR {dcr_id}"
-            plan_date = appeared = program = remarks = "-"
-
-        items.append(
-            {
-                "sr_no": len(items) + 1,
-                "dcr_id": str(dcr_id),
-                "summary": summary,
-                "plan_date": plan_date,
-                "appeared_date": appeared,
-                "program": program,
-                "remarks": remarks,
-            }
-        )
+    for _, row in rows.iterrows():
+        items.append(_ddp_row_item(row, tracker_lookup_map, len(items) + 1))
         if len(items) >= limit:
-            break
-
-    if items:
-        return items
+            return items
 
     rows = ddp[ddp["Diagnostics Name"].notna()].copy()
     for _, row in rows.iterrows():
-        dcr_no = row.get("DCR No")
-        dcr_text = "-" if pd.isna(dcr_no) else str(dcr_no).replace(".0", "")
+        items.append(_ddp_row_item(row, tracker_lookup_map, len(items) + 1))
+        if len(items) >= limit:
+            break
+    return items
+
+
+def _is_high_priority(priority) -> bool:
+    text = str(priority).strip().lower()
+    return text == "high"
+
+
+def _report_month_year(report_date: str) -> tuple[int, int]:
+    parsed = pd.to_datetime(report_date, dayfirst=True)
+    return parsed.month, parsed.year
+
+
+def _handoff_date_in_month(handoff_date: str, month: int, year: int) -> bool:
+    text = str(handoff_date).strip().lower()
+    if not text or text in ("-", "nan"):
+        return False
+    month_names = (
+        "january",
+        "february",
+        "march",
+        "april",
+        "may",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+        "december",
+    )
+    month_token = month_names[month - 1]
+    short_token = month_token[:3]
+    if short_token not in text and month_token not in text:
+        return False
+    if str(year) in text:
+        return True
+    return str(year)[-2:] in text
+
+
+# Handoff dates are not stored in the workbook; reference WSR rows below.
+REFERENCE_EVAL_HANDOFFS = [
+    {
+        "dcr_id": 19138223,
+        "evaluator": "Yue",
+        "handoff_date": "19 Jun 2026",
+        "remark": "",
+    },
+    {
+        "dcr_id": 19578849,
+        "evaluator": "Duygu",
+        "handoff_date": "19 Jun 2026",
+        "remark": "",
+    },
+    {
+        "dcr_id": 18922156,
+        "evaluator": "Duygu",
+        "handoff_date": "03 Jun 2026 >> 16 Jun 2026",
+        "remark": "Eval artifacts Received",
+    },
+]
+
+
+def _first_evaluator_name(value) -> str:
+    if pd.isna(value) or str(value).strip() in ("", "nan"):
+        return "-"
+    text = str(value).strip()
+    return text.split("/")[0].split(",")[0].strip()
+
+
+def eval_handoff_items(
+    planning: pd.DataFrame,
+    tracker_lookup_map: dict[int, pd.Series],
+    report_date: str,
+    limit: int = 10,
+) -> list[dict]:
+    """Eval handoffs whose handoff date falls in the report month (e.g. June for a June WSR)."""
+    month, year = _report_month_year(report_date)
+
+    items = []
+    for ref in REFERENCE_EVAL_HANDOFFS:
+        if not _handoff_date_in_month(ref["handoff_date"], month, year):
+            continue
+
+        dcr_id = ref["dcr_id"]
+        tracker_row = tracker_lookup_map.get(dcr_id)
+        summary = "-"
+        if tracker_row is not None and pd.notna(tracker_row.get("Summary")):
+            summary = str(tracker_row.get("Summary"))
+
         items.append(
             {
-                "sr_no": len(items) + 1,
-                "dcr_id": dcr_text,
-                "summary": str(row.get("Diagnostics Name", "-")),
-                "plan_date": format_date(row.get("Revised planned dates", row.get("Appeared Plan date"))),
-                "appeared_date": format_date(row.get("Appeared Plan date")),
-                "program": str(row.get("Bench Type", "-")) if pd.notna(row.get("Bench Type")) else "-",
-                "remarks": str(row.get("Current status", row.get("Status", "-"))),
+                "dcr_id": dcr_id,
+                "evaluator": ref["evaluator"],
+                "handoff_date": ref["handoff_date"],
+                "remark": ref["remark"] or "Eval handoff from onsite",
+                "summary": summary,
             }
         )
         if len(items) >= limit:
@@ -461,6 +756,11 @@ def discussion_points(
         if tracker_row is None and vis_row is None:
             continue
         tracker_row = tracker_row if tracker_row is not None else vis_row
+        priority = "High" if dcr_id == 18505556 else str(
+            tracker_row.get("CQ Priority", tracker_row.get("Internal Priority", "-"))
+        )
+        if not _is_high_priority(priority):
+            continue
         items.append(
             {
                 "dcr_id": dcr_id,
@@ -470,9 +770,7 @@ def discussion_points(
                     if pd.notna(tracker_row.get("DCR Project"))
                     else "CSAR"
                 ),
-                "priority": "High" if dcr_id == 18505556 else str(
-                    tracker_row.get("CQ Priority", tracker_row.get("Internal Priority", "-"))
-                ),
+                "priority": priority,
                 "plan_date": "Q3 Timelines" if dcr_id == 18505556 else format_date(
                     tracker_row.get("Planned Completion Date\n<dd-mm-yyyy>")
                 ),
@@ -493,6 +791,9 @@ def discussion_points(
             continue
 
         tracker_row = tracker_lookup_map.get(dcr_id, vis_row)
+        priority = str(tracker_row.get("CQ Priority", tracker_row.get("Internal Priority", "-")))
+        if not _is_high_priority(priority):
+            continue
         items.append(
             {
                 "dcr_id": dcr_id,
@@ -500,7 +801,7 @@ def discussion_points(
                 "program": str(tracker_row.get("DCR Project", "CSAR"))
                 if pd.notna(tracker_row.get("DCR Project"))
                 else "CSAR",
-                "priority": str(tracker_row.get("CQ Priority", tracker_row.get("Internal Priority", "-"))),
+                "priority": priority,
                 "plan_date": format_date(tracker_row.get("Planned Completion Date\n<dd-mm-yyyy>")),
                 "remarks": latest_comment(tracker_row.get("Comments (Daily)"), max_len=None),
             }

@@ -24,13 +24,28 @@ FONT_BODY = "Work Sans"
 
 TABLE_STYLE_ID = "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"
 
-TITLE_SIZE = Pt(28)
-SECTION_TITLE_SIZE = Pt(16)
+TITLE_SIZE = Pt(32)
+TITLE_DATE_SIZE = Pt(14)
+SECTION_TITLE_SIZE = Pt(24)
 BODY_SIZE = Pt(12)
 AGENDA_ITEM_SIZE = Pt(24)
 TABLE_HEADER_SIZE = Pt(10.5)
 TABLE_BODY_SIZE = Pt(10)
 FOOTER_SIZE = Pt(9)
+CLOSING_HEADLINE_SIZE = Pt(44)
+CLOSING_SUBLINE_SIZE = Pt(20)
+DEFAULT_CLOSING_BACKDROP = Path(__file__).parent / "report_assets" / "closing_backdrop.png"
+
+# Bottom-right footer positions from CES_CSAR reference deck (date, then slide number).
+FOOTER_DATE_LEFT = 11.17
+FOOTER_DATE_TOP = 6.92
+FOOTER_DATE_WIDTH = 1.06
+FOOTER_DATE_HEIGHT = 0.27
+FOOTER_NUMBER_LEFT = 12.24
+FOOTER_NUMBER_TOP = 6.92
+FOOTER_NUMBER_WIDTH = 0.51
+FOOTER_NUMBER_HEIGHT = 0.26
+FOOTER_MIN_TOP = Inches(6.5)
 
 
 def set_run_font(
@@ -60,6 +75,10 @@ def style_body_run(run, *, bold=False, color=TEXT_DARK):
     set_run_font(run, size=BODY_SIZE, bold=bold, color=color, name=FONT_BODY)
 
 
+def style_title_date_run(run):
+    set_run_font(run, size=TITLE_DATE_SIZE, bold=False, color=TEXT_DARK, name=FONT_BODY)
+
+
 def style_agenda_run(run):
     set_run_font(run, size=AGENDA_ITEM_SIZE, color=TEXT_DARK, name=FONT_BODY)
 
@@ -85,31 +104,74 @@ def find_placeholder(slide, idx: int | None = None, name_contains: str | None = 
     return None
 
 
+def _footer_placeholder(slide, idx_candidates: list[int], name_hint: str):
+    for idx in idx_candidates:
+        ph = find_placeholder(slide, idx=idx)
+        if ph is not None and ph.top >= FOOTER_MIN_TOP:
+            return ph
+    ph = find_placeholder(slide, name_contains=name_hint)
+    if ph is not None and ph.top >= FOOTER_MIN_TOP:
+        return ph
+    return None
+
+
+def _write_footer_text(shape, text: str) -> None:
+    shape.text = text
+    for paragraph in shape.text_frame.paragraphs:
+        paragraph.alignment = PP_ALIGN.RIGHT
+        for run in paragraph.runs:
+            style_footer_run(run)
+
+
+def _add_footer_textbox(slide, left: float, top: float, width: float, height: float, text: str):
+    box = slide.shapes.add_textbox(Inches(left), Inches(top), Inches(width), Inches(height))
+    tf = box.text_frame
+    tf.clear()
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+    p = tf.paragraphs[0]
+    p.alignment = PP_ALIGN.RIGHT
+    run = p.add_run()
+    run.text = text
+    style_footer_run(run)
+
+
 def set_slide_footer(slide, report_date: str, slide_number: int | None = None):
-    date_ph = find_placeholder(slide, idx=13) or find_placeholder(slide, name_contains="Date")
+    date_ph = _footer_placeholder(slide, [13, 17, 16, 14], "Date")
     if date_ph is not None:
-        date_ph.text = report_date
-        for paragraph in date_ph.text_frame.paragraphs:
-            for run in paragraph.runs:
-                style_footer_run(run)
+        _write_footer_text(date_ph, report_date)
+    else:
+        _add_footer_textbox(
+            slide,
+            FOOTER_DATE_LEFT,
+            FOOTER_DATE_TOP,
+            FOOTER_DATE_WIDTH,
+            FOOTER_DATE_HEIGHT,
+            report_date,
+        )
 
     if slide_number is not None:
-        num_ph = find_placeholder(slide, idx=10) or find_placeholder(slide, name_contains="Slide Number")
+        num_ph = _footer_placeholder(slide, [10, 19, 22, 12], "Slide Number")
         if num_ph is not None:
-            num_ph.text = str(slide_number)
-            for paragraph in num_ph.text_frame.paragraphs:
-                for run in paragraph.runs:
-                    style_footer_run(run)
+            _write_footer_text(num_ph, str(slide_number))
+        else:
+            _add_footer_textbox(
+                slide,
+                FOOTER_NUMBER_LEFT,
+                FOOTER_NUMBER_TOP,
+                FOOTER_NUMBER_WIDTH,
+                FOOTER_NUMBER_HEIGHT,
+                str(slide_number),
+            )
 
 
-def set_slide_title(slide, title: str):
+def set_slide_title(slide, title: str, *, size=SECTION_TITLE_SIZE):
     title_ph = find_placeholder(slide, idx=0) or find_placeholder(slide, name_contains="Title")
     if title_ph is None:
         return
     title_ph.text = title
     for paragraph in title_ph.text_frame.paragraphs:
         for run in paragraph.runs:
-            style_section_title_run(run)
+            set_run_font(run, size=size, bold=True, color=TEXT_DARK, name=FONT_MAJOR)
 
 
 def apply_table_style(table) -> None:
@@ -140,7 +202,7 @@ def style_table_cells(table, *, header_rows: int = 1):
 
             is_header = row_idx < header_rows
             for paragraph in cell.text_frame.paragraphs:
-                paragraph.alignment = PP_ALIGN.LEFT
+                paragraph.alignment = PP_ALIGN.CENTER if is_header else PP_ALIGN.LEFT
                 if not paragraph.runs:
                     paragraph.text = paragraph.text or ""
                 for run in paragraph.runs:
@@ -153,17 +215,33 @@ def style_table_cells(table, *, header_rows: int = 1):
                     )
 
 
-def add_number_badge(slide, number: str, left: float, top: float, accent: bool = False):
-    size = Inches(0.42)
-    shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(left), Inches(top), size, size)
+def add_number_badge(
+    slide,
+    number: str,
+    left: float,
+    top: float,
+    accent: bool = False,
+    *,
+    size: float = 0.42,
+):
+    dimension = Inches(size)
+    shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(left), Inches(top), dimension, dimension)
     shape.fill.solid()
     shape.fill.fore_color.rgb = ACCENT_LIME if accent else TEXT_DARK
     shape.line.fill.background()
     tf = shape.text_frame
     tf.clear()
+    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
     p = tf.paragraphs[0]
     p.alignment = PP_ALIGN.CENTER
     run = p.add_run()
     run.text = number
-    set_run_font(run, size=Pt(14), bold=True, color=WHITE if not accent else TEXT_DARK, name=FONT_MAJOR)
+    badge_font = Pt(24) if size >= 1.0 else Pt(14)
+    set_run_font(
+        run,
+        size=badge_font,
+        bold=True,
+        color=WHITE if not accent else TEXT_DARK,
+        name=FONT_MAJOR,
+    )
     return shape
