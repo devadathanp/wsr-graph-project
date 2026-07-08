@@ -9,3 +9,9 @@ __pycache__/
 .venv/
 venv/
 .matplotlib/
+build/
+dist/
+
+# Bundled runtime assets shipped inside the app (override *.png ignore above).
+!assets/
+!assets/*.png

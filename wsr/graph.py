@@ -107,6 +107,30 @@ def _coerce_graph_numeric(section: pd.DataFrame) -> pd.DataFrame:
     return section
 
 
+def latest_reported_week(
+    data_file: str = DEFAULT_DATA_FILE,
+) -> tuple[int | None, str | None]:
+    """Auto-detect the current reporting week and its date from the graph sheet.
+
+    Future weeks only carry the projected baseline plan; the current week is the
+    latest one that has actual weekly-completion data filled in. Returns
+    ``(week_no, "dd-mm-yyyy")`` or ``(None, None)`` when nothing is populated yet.
+    """
+    df = load_graph_sheet(data_file)
+    week: int | None = None
+    date_label: str | None = None
+    for section in (get_evaluation_data(df), get_implementation_data(df)):
+        reported = section[section[COL_PCT_ACTUAL].notna()]
+        if reported.empty:
+            continue
+        row = reported.iloc[-1]
+        candidate = int(row[COL_WEEK])
+        if week is None or candidate > week:
+            week = candidate
+            date_label = pd.to_datetime(row[COL_DATE]).strftime("%d-%m-%Y")
+    return week, date_label
+
+
 def add_week_labels(section: pd.DataFrame) -> pd.DataFrame:
     section = section.copy()
     section["Week Label"] = (

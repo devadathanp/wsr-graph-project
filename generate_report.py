@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 
 from wsr.constants import DEFAULT_DATA_FILE
+from wsr.graph import latest_reported_week
 from wsr.pending import pending_week_for_chart
 from wsr.report import generate_report
 from wsr_style import DEFAULT_TEMPLATE
@@ -40,10 +41,15 @@ def main():
     parser.add_argument(
         "--week",
         type=int,
-        default=25,
-        help="Chart week number (pending tables use week-1, matching reference PDF)",
+        default=None,
+        help="Chart week number (auto-detected from the graph sheet if omitted; "
+        "pending tables use week-1, matching reference PDF)",
     )
-    parser.add_argument("--date", default=None, help="Report date label (dd-mm-yyyy)")
+    parser.add_argument(
+        "--date",
+        default=None,
+        help="Report date label dd-mm-yyyy (auto-detected from the graph sheet if omitted)",
+    )
     parser.add_argument("--assets-dir", default="report_assets", help="Directory for chart images")
     parser.add_argument(
         "--closing-image",
@@ -62,6 +68,11 @@ def main():
     )
     args = parser.parse_args()
 
+    week = args.week
+    if week is None:
+        detected_week, _ = latest_reported_week(args.data)
+        week = detected_week
+
     output = generate_report(
         output_path=args.output,
         data_file=args.data,
@@ -74,7 +85,8 @@ def main():
     )
     print(f"Report generated: {output}")
     print(f"Template: {args.template}")
-    print(f"Chart week: {args.week} | Pending tables week: {pending_week_for_chart(args.week)}")
+    if week is not None:
+        print(f"Chart week: {week} | Pending tables week: {pending_week_for_chart(week)}")
 
 
 if __name__ == "__main__":

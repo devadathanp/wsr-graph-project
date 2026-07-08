@@ -10,6 +10,7 @@ from pptx import Presentation
 
 from wsr.charts import save_evaluation_chart, save_implementation_chart, save_planning_chart
 from wsr.constants import DEFAULT_DATA_FILE
+from wsr.graph import latest_reported_week
 from wsr.loaders import load_ddp_plan, load_non_stla_planning, load_tracker, load_visibility
 from wsr.pending import graph_week_capacity, pending_items, pending_week_for_chart
 from wsr.planning_book import load_quarterly_planning
@@ -40,7 +41,7 @@ from wsr_style import DEFAULT_TEMPLATE, delete_all_slides
 def generate_report(
     output_path: str | Path = "WSR_Report.pptx",
     data_file: str = DEFAULT_DATA_FILE,
-    chart_week: int = 25,
+    chart_week: int | None = None,
     report_date: str | None = None,
     assets_dir: str | Path = "report_assets",
     template_path: str | Path = DEFAULT_TEMPLATE,
@@ -51,10 +52,21 @@ def generate_report(
     assets_dir.mkdir(exist_ok=True)
     closing_image_path = Path(closing_image) if closing_image else None
     planning_book_path = Path(planning_book) if planning_book else None
-    pending_week = pending_week_for_chart(chart_week)
 
+    # Auto-detect the current reporting week/date from the scrum workbook when
+    # not supplied, so a one-click run needs no manual input.
+    detected_week, detected_date = latest_reported_week(data_file)
+    if chart_week is None:
+        if detected_week is None:
+            raise ValueError(
+                "Could not detect the reporting week from the graph sheet. "
+                "Pass an explicit week number."
+            )
+        chart_week = detected_week
     if report_date is None:
-        report_date = datetime.now().strftime("%d-%m-%Y")
+        report_date = detected_date or datetime.now().strftime("%d-%m-%Y")
+
+    pending_week = pending_week_for_chart(chart_week)
 
     impl_chart = save_implementation_chart(assets_dir / "implementation_chart.png", data_file=data_file)
     eval_chart = save_evaluation_chart(assets_dir / "evaluation_chart.png", data_file=data_file)

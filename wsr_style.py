@@ -11,7 +11,9 @@ from pptx.oxml.ns import qn
 from pptx.oxml.xmlchemy import OxmlElement
 from pptx.util import Inches, Pt
 
-DEFAULT_TEMPLATE = Path(__file__).parent / "templates" / "CES_CSAR_WSR_Template.pptx"
+from wsr.resources import resource_path
+
+DEFAULT_TEMPLATE = resource_path("templates", "CES_CSAR_WSR_Template.pptx")
 
 # Cummins / CES deck palette (from template theme1.xml)
 ACCENT_LIME = RGBColor(0xB0, 0xFF, 0x45)      # accent1
@@ -43,7 +45,7 @@ TABLE_BODY_SIZE = Pt(10)
 FOOTER_SIZE = Pt(9)
 CLOSING_HEADLINE_SIZE = Pt(44)
 CLOSING_SUBLINE_SIZE = Pt(20)
-DEFAULT_CLOSING_BACKDROP = Path(__file__).parent / "report_assets" / "closing_backdrop.png"
+DEFAULT_CLOSING_BACKDROP = resource_path("assets", "closing_backdrop.png")
 
 # Bottom-right footer positions from CES_CSAR reference deck (date, then slide number).
 FOOTER_DATE_LEFT = 11.17
