@@ -8,3 +8,4 @@ __pycache__/
 .Python
 .venv/
 venv/
+.matplotlib/

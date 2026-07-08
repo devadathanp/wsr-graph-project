@@ -7,6 +7,19 @@ import pandas as pd
 
 from wsr.constants import DEFAULT_DATA_FILE, GRAPH_SHEET
 
+# Column headers from row 3 of CSAR_WSR_Graph (Non-STLA) — single source of truth for charts.
+COL_WEEK = "Week No"
+COL_DATE = "Date"
+COL_CUMULATIVE_BASELINE = "Cumulative (Baseline Plan)"
+COL_CUMULATIVE_REVISED = "Cumulative Revised basline plan"
+COL_COMPLETED = "Cumulative (Completed)"
+COL_REJECTED = "Cumulative Rejected / Transferred/ Moved to next quarter"
+COL_IN_PROGRESS = "Eval In Progress"
+COL_DRB = "DRB /l2 Reviews & Rework  in progress"
+COL_PCT_CONFIDENCE = "% Completion Confidence - Overall"
+COL_PCT_ACTUAL = "% Actual weekly completion wr.t  revised Baseline"
+COL_REMARKS = "Remarks"
+
 
 def to_percentage(series: pd.Series) -> pd.Series:
     def convert(value):
@@ -55,9 +68,9 @@ def get_evaluation_data(df: pd.DataFrame | None = None, data_file: str = DEFAULT
 
     impl_header_idx = df.index[df["Tagged to Release"].astype(str).str.strip() == "Implementation"]
     eval_df = df.loc[: impl_header_idx[0] - 1]
-    section = eval_df[eval_df["Week No"].notna()].copy()
+    section = eval_df[eval_df[COL_WEEK].notna()].copy()
     section.reset_index(drop=True, inplace=True)
-    return section
+    return _coerce_graph_numeric(section)
 
 
 def get_implementation_data(df: pd.DataFrame | None = None, data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
@@ -69,21 +82,41 @@ def get_implementation_data(df: pd.DataFrame | None = None, data_file: str = DEF
         & df["Tagged to Release"].astype(str).str.contains("Implementation", na=False)
     ]
     section = df.loc[impl_start_idx[0] :]
-    section = section[section["Week No"].notna()].copy()
+    section = section[section[COL_WEEK].notna()].copy()
     section.reset_index(drop=True, inplace=True)
+    return _coerce_graph_numeric(section)
+
+
+def _coerce_graph_numeric(section: pd.DataFrame) -> pd.DataFrame:
+    """Ensure graph count columns are numeric (as stored in the Excel sheet)."""
+    section = section.copy()
+    numeric_cols = [
+        COL_CUMULATIVE_BASELINE,
+        COL_CUMULATIVE_REVISED,
+        COL_COMPLETED,
+        COL_REJECTED,
+        COL_IN_PROGRESS,
+        COL_DRB,
+        COL_PCT_CONFIDENCE,
+        COL_PCT_ACTUAL,
+        "% Actual weekly completion wr.t Baseline",
+    ]
+    for column in numeric_cols:
+        if column in section.columns:
+            section[column] = pd.to_numeric(section[column], errors="coerce")
     return section
 
 
 def add_week_labels(section: pd.DataFrame) -> pd.DataFrame:
     section = section.copy()
     section["Week Label"] = (
-        section["Week No"].astype(str) + "\n" + pd.to_datetime(section["Date"]).dt.strftime("%d-%m")
+        section[COL_WEEK].astype(str) + "\n" + pd.to_datetime(section[COL_DATE]).dt.strftime("%d-%m")
     )
     return section
 
 
 def week_remarks(section: pd.DataFrame, week_no: int) -> str:
-    match = section[section["Week No"] == week_no]
+    match = section[section[COL_WEEK] == week_no]
     if match.empty:
         return ""
     remark = match.iloc[0].get("Remarks")
