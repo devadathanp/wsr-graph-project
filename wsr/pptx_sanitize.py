@@ -71,7 +71,6 @@ def _rebuild_app_xml(data: bytes, titles: list[str]) -> bytes:
             el = etree.SubElement(root, f"{app}{tag}")
         el.text = str(value)
 
-    # Preserve the existing theme name (first TitlesOfParts entry) when present.
     theme_name = "Office Theme"
     titles_of_parts = root.find(f"{app}TitlesOfParts")
     if titles_of_parts is not None:

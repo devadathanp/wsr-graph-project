@@ -43,12 +43,14 @@ def main():
         type=int,
         default=None,
         help="Chart week number (auto-detected from the graph sheet if omitted; "
-        "pending tables use week-1, matching reference PDF)",
+        "pending table titles use the same week)",
     )
     parser.add_argument(
         "--date",
         default=None,
-        help="Report date label dd-mm-yyyy (auto-detected from the graph sheet if omitted)",
+        help="Report date dd-mm-yyyy (shown on slides; also used as the Planned "
+        "Completion cutoff for evaluation/implementation pending on slides 5–6). "
+        "Auto-detected from the graph sheet if omitted.",
     )
     parser.add_argument("--assets-dir", default="report_assets", help="Directory for chart images")
     parser.add_argument(

@@ -77,7 +77,7 @@ def add_summary_key_value_table(
     top: float,
     width: float,
 ) -> float:
-    row_height = 0.23
+    row_height = 0.32
     table_height = row_height * max(len(rows), 1)
     table_shape = slide.shapes.add_table(
         len(rows),

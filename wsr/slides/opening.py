@@ -9,6 +9,7 @@ from pptx.util import Inches
 from wsr.constants import AGENDA_BADGE_SIZE, AGENDA_ITEMS, AGENDA_LAYOUT, LAYOUT_OPENING
 from wsr.slides.base import add_table, empty_row, new_content_slide
 from wsr_style import (
+    FONT_BODY,
     FONT_MAJOR,
     TEXT_DARK,
     TITLE_SIZE,
@@ -34,7 +35,7 @@ def add_title_slide(prs: Presentation, report_date: str) -> None:
         style_title_run(line1)
         line2 = text_frame.add_paragraph().add_run()
         line2.text = "Weekly Status Report"
-        set_run_font(line2, size=TITLE_SIZE, bold=False, color=TEXT_DARK, name=FONT_MAJOR)
+        set_run_font(line2, size=TITLE_SIZE, bold=False, color=TEXT_DARK, name=FONT_BODY)
 
     date_ph = find_placeholder(slide, idx=16)
     if date_ph is not None:
@@ -58,7 +59,7 @@ def add_agenda_slide(prs: Presentation, report_date: str) -> None:
             str(idx),
             left=0.67,
             top=layout["badge_top"],
-            accent=idx >= 3,
+            accent=True,
             size=AGENDA_BADGE_SIZE,
         )
         box = slide.shapes.add_textbox(
@@ -82,8 +83,14 @@ def add_mom_slide(prs: Presentation, report_date: str) -> None:
         "Action Items",
         "Status",
         "Ownership",
+        "Action item identified",
         "Action closure date",
         "Remarks",
     ]
     rows = [empty_row(len(headers))]
-    add_table(slide, headers, rows, col_widths=[0.6, 2.6, 1.7, 1.0, 0.95, 1.45, 3.0])
+    add_table(
+        slide,
+        headers,
+        rows,
+        col_widths=[0.55, 2.2, 1.45, 0.9, 0.95, 1.45, 1.35, 2.45],
+    )

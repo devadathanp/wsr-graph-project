@@ -8,16 +8,23 @@ from wsr.constants import DEFAULT_DATA_FILE, PENDING_TABLE_ROW_CAP
 from wsr.graph import get_evaluation_data, get_implementation_data
 from wsr.tracker import (
     closure_date_from_row,
-    closure_sort_key,
-    comment_activity_score,
+    coerce_tracker_date,
     eval_status_from_row,
     impl_status_from_row,
     latest_comment,
-    parse_dcr_id,
     support_required_from_row,
     tracker_row_for_mode,
     visibility_row,
 )
+
+PLAN_COMPLETION_COL = "Planned Completion Date\n<dd-mm-yyyy>"
+
+# Slide 5 / 6 tracker filters: PRCRState + At Risk + Planned Completion cutoff.
+_PENDING_PRCR_STATE = {
+    "evaluation": "Evaluate",
+    "implementation": "Implement",
+}
+_PENDING_AT_RISK = "On Track"
 
 
 def build_pending_item(
@@ -25,8 +32,10 @@ def build_pending_item(
     tracker_rows: dict[int, list[pd.Series]],
     visibility: pd.DataFrame,
     mode: str,
+    tracker_row: pd.Series | None = None,
 ) -> dict | None:
-    tracker_row = tracker_row_for_mode(tracker_rows, dcr_id, mode)
+    if tracker_row is None:
+        tracker_row = tracker_row_for_mode(tracker_rows, dcr_id, mode)
     if tracker_row is None:
         return None
     vis_row = visibility_row(visibility, dcr_id)
@@ -49,82 +58,77 @@ def build_pending_item(
     }
 
 
+def _filtered_pending_items(
+    tracker_rows: dict[int, list[pd.Series]],
+    visibility: pd.DataFrame,
+    *,
+    mode: str,
+    prcr_state: str,
+    cutoff_date: pd.Timestamp,
+) -> list[dict]:
+    """Pending-closure rows filtered from the Non STLA tracker.
+
+    1. PRCRState == ``prcr_state`` (Evaluate for slide 5, Implement for slide 6)
+    2. At Risk == On Track
+    3. Planned Completion Date <= report cutoff date
+    """
+    cutoff = pd.Timestamp(cutoff_date).normalize()
+    selected: list[tuple[pd.Timestamp, int, pd.Series]] = []
+    seen: set[int] = set()
+
+    for dcr_id, rows in tracker_rows.items():
+        for row in rows:
+            if str(row.get("PRCRState", "")).strip() != prcr_state:
+                continue
+            if str(row.get("At Risk", "")).strip() != _PENDING_AT_RISK:
+                continue
+            planned = coerce_tracker_date(row.get(PLAN_COMPLETION_COL))
+            if planned is None or planned.normalize() > cutoff:
+                continue
+            if dcr_id in seen:
+                continue
+            seen.add(dcr_id)
+            selected.append((planned.normalize(), dcr_id, row))
+
+    selected.sort(key=lambda item: (item[0], item[1]))
+
+    items: list[dict] = []
+    for _, dcr_id, row in selected:
+        item = build_pending_item(dcr_id, tracker_rows, visibility, mode, tracker_row=row)
+        if item is not None:
+            items.append(item)
+    return items
+
+
 def pending_items(
     visibility: pd.DataFrame,
     tracker_rows: dict[int, list[pd.Series]],
     mode: str,
     pending_week: int | None = None,
     limit: int = PENDING_TABLE_ROW_CAP,
+    cutoff_date: pd.Timestamp | str | None = None,
 ) -> list[dict]:
-    del pending_week  # week label is applied on the slide; rows come from current workbook state.
+    del pending_week, limit  # week is slide label only; limit unused after filter rewrite.
     mode = mode.lower()
+    if mode not in _PENDING_PRCR_STATE:
+        raise ValueError(f"Unknown pending mode: {mode}")
+    if cutoff_date is None:
+        raise ValueError(f"cutoff_date is required for {mode} pending selection")
+    if not isinstance(cutoff_date, pd.Timestamp):
+        cutoff_date = pd.to_datetime(cutoff_date, dayfirst=True)
 
-    if mode == "evaluation":
-        type_mask = visibility["Evaluation/ Implementation"].astype(str).str.contains("Eval", case=False, na=False)
-    else:
-        type_mask = visibility["Evaluation/ Implementation"].astype(str).str.contains("Impl", case=False, na=False)
-
-    excluded_status = visibility["Status"].astype(str).str.contains(
-        r"Rejected|Cancelled|Deferred|Closed", case=False, na=False
+    return _filtered_pending_items(
+        tracker_rows,
+        visibility,
+        mode=mode,
+        prcr_state=_PENDING_PRCR_STATE[mode],
+        cutoff_date=cutoff_date,
     )
-
-    candidates: list[tuple[int, int]] = []
-    for _, vis_row in visibility[type_mask & ~excluded_status].iterrows():
-        dcr_id = parse_dcr_id(vis_row.get("DCR Number"))
-        if dcr_id is None:
-            continue
-
-        tracker_row = tracker_row_for_mode(tracker_rows, dcr_id, mode)
-        if tracker_row is None:
-            continue
-        if pd.notna(tracker_row.get("Actual Cmpln Date\n<dd-mm-yyyy>")):
-            continue
-
-        status = str(vis_row.get("Status", ""))
-        score = comment_activity_score(tracker_row.get("Comments (Daily)"))
-        if status in ("On Track", "At Risk", "Yet to start", "On Hold"):
-            score += 4
-        if mode == "implementation":
-            summary = str(tracker_row.get("Summary", "")).lower()
-            comments = str(tracker_row.get("Comments (Daily)", "")).lower()
-            if "l2" in comments:
-                score += 5
-            if "appguide" in summary or "app-guide" in summary:
-                score += 4
-            if "dummy" in summary:
-                score -= 10
-        else:
-            if str(tracker_row.get("PRCR Stage", "")) in ("Verify", "Submit", "Assess", "In Progress"):
-                score += 2
-
-        candidates.append((score, dcr_id))
-
-    candidates.sort(key=lambda item: (-item[0], item[1]))
-    selected_ids: list[int] = []
-    seen: set[int] = set()
-    for _, dcr_id in candidates:
-        if dcr_id in seen:
-            continue
-        seen.add(dcr_id)
-        selected_ids.append(dcr_id)
-        if len(selected_ids) >= limit:
-            break
-
-    items = []
-    for dcr_id in selected_ids:
-        item = build_pending_item(dcr_id, tracker_rows, visibility, mode)
-        if item is not None:
-            items.append(item)
-
-    if mode == "evaluation":
-        items.sort(key=lambda item: closure_sort_key(item["closure_date"]))
-
-    return items
 
 
 def pending_week_for_chart(chart_week: int) -> int:
-    """PDF uses prior week for pending-closure tables while charts show current week."""
-    return max(chart_week - 1, 1)
+    """Pending-closure table titles use the same week as the charts."""
+    return chart_week
 
 
 def graph_week_capacity(data_file: str, pending_week: int, mode: str) -> int:

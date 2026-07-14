@@ -15,3 +15,6 @@ dist/
 # Bundled runtime assets shipped inside the app (override *.png ignore above).
 !assets/
 !assets/*.png
+.DS_Store
+*.xlsm
+!templates/

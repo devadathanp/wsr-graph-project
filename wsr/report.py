@@ -12,7 +12,7 @@ from wsr.charts import save_evaluation_chart, save_implementation_chart, save_pl
 from wsr.constants import DEFAULT_DATA_FILE
 from wsr.graph import latest_reported_week
 from wsr.loaders import load_ddp_plan, load_non_stla_planning, load_tracker, load_visibility
-from wsr.pending import graph_week_capacity, pending_items, pending_week_for_chart
+from wsr.pending import pending_items, pending_week_for_chart
 from wsr.planning_book import load_quarterly_planning
 from wsr.pptx_sanitize import sanitize_pptx
 from wsr.report_data import (
@@ -79,13 +79,21 @@ def generate_report(
     tracker_map = tracker_lookup(tracker)
     tracker_rows = tracker_rows_lookup(tracker)
 
-    eval_limit = graph_week_capacity(data_file, pending_week, "evaluation")
-    impl_limit = graph_week_capacity(data_file, pending_week, "implementation")
+    # Slides 5/6: At Risk=On Track, Planned Completion <= report_date;
+    # PRCRState is Evaluate (slide 5) or Implement (slide 6).
     eval_pending = pending_items(
-        visibility, tracker_rows, mode="evaluation", pending_week=pending_week, limit=eval_limit
+        visibility,
+        tracker_rows,
+        mode="evaluation",
+        pending_week=pending_week,
+        cutoff_date=report_date,
     )
     impl_pending = pending_items(
-        visibility, tracker_rows, mode="implementation", pending_week=pending_week, limit=impl_limit
+        visibility,
+        tracker_rows,
+        mode="implementation",
+        pending_week=pending_week,
+        cutoff_date=report_date,
     )
     ddp_items = ddp_ms45_items(ddp, tracker_map)
     handoff_items = eval_handoff_items(planning, tracker_map, report_date)

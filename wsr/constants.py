@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-DEFAULT_DATA_FILE = "data.xlsm"
+DEFAULT_DATA_FILE = "SCRUM_PFS_Jul'26.xlsm"
 GRAPH_SHEET = "CSAR_WSR_Graph (Non-STLA)"
 TRACKER_SHEET = "Non STLA"
 VISIBILITY_SHEET = "Visibility Sheet."
@@ -26,7 +26,7 @@ DCR_IMPL_TOP = 4.22
 DCR_PANEL_LEFT = 9.85
 DCR_PANEL_WIDTH = 3.2
 DCR_SUMMARY_TOP = 0.95
-DCR_NOTES_GAP = 0.12
+DCR_NOTES_GAP = 0.40
 DCR_STATUS_NOTE_LINES = [
     "The initial plan is based on high level estimations and DCRs in KPIT Pune team's bucket as on date.",
     "Revised baseline plan is updated based on reshuffling done during execution in the quarter "

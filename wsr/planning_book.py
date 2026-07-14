@@ -8,6 +8,11 @@ from openpyxl import load_workbook
 
 from wsr.constants import DEFAULT_PLANNING_BOOK
 
+# Only hardcoded planning input — second bar is this share of Q3 available hours.
+PLANNED_BANDWIDTH_PCT = 90
+
+_AVAILABLE_LABEL = "total work hrs available for pfs team"
+
 
 def _as_float(value) -> float | None:
     try:
@@ -18,6 +23,49 @@ def _as_float(value) -> float | None:
         return None
 
 
+def _normalize_label(value) -> str:
+    return " ".join(str(value).strip().lower().replace(".", " ").split())
+
+
+def _lookup_available_hours(ws) -> tuple[float | None, int | None]:
+    """Find 'Total work Hrs. Available for PFS team' and the hours in column D.
+
+    The sheet repeats this label (full team, method variants, and headcount
+    splits). The WSR chart uses the PFS-available figure next to the label —
+    among rows that have a team-member count, prefer the largest hours value
+    that is not the full-team total.
+    """
+    candidates: list[dict] = []
+    for row_idx in range(1, (ws.max_row or 0) + 1):
+        label = ws.cell(row_idx, 2).value  # column B
+        if not label or _AVAILABLE_LABEL not in _normalize_label(label):
+            continue
+        hours = _as_float(ws.cell(row_idx, 4).value)  # column D
+        if hours is None:
+            continue
+        members = _as_float(ws.cell(row_idx, 9).value)  # column I
+        candidates.append(
+            {
+                "hours": hours,
+                "members": int(round(members)) if members is not None else None,
+            }
+        )
+
+    if not candidates:
+        return None, None
+
+    with_members = [c for c in candidates if c["members"] is not None]
+    if len(with_members) >= 2:
+        max_members = max(c["members"] for c in with_members)
+        subsets = [c for c in with_members if c["members"] < max_members]
+        if subsets:
+            best = max(subsets, key=lambda c: c["hours"])
+            return best["hours"], best["members"]
+
+    best = with_members[-1] if with_members else candidates[-1]
+    return best["hours"], best["members"]
+
+
 def load_quarterly_planning(planning_book: str | Path | None = None) -> dict[str, int] | None:
     workbook_path = Path(planning_book) if planning_book else DEFAULT_PLANNING_BOOK
     if not workbook_path.exists():
@@ -26,17 +74,15 @@ def load_quarterly_planning(planning_book: str | Path | None = None) -> dict[str
     wb = load_workbook(workbook_path, data_only=True)
     ws = wb[wb.sheetnames[0]]
 
-    available_hours = _as_float(ws["H34"].value)
-    planned_hours = _as_float(ws["H36"].value)
-    planned_pct_raw = _as_float(ws["H37"].value)
-    resources_raw = _as_float(ws["I44"].value)
-
-    if None in (available_hours, planned_hours, planned_pct_raw, resources_raw):
+    available_hours, resources = _lookup_available_hours(ws)
+    if available_hours is None:
         return None
+
+    planned_hours = available_hours * (PLANNED_BANDWIDTH_PCT / 100.0)
 
     return {
         "available_hours": int(round(available_hours)),
         "planned_hours": int(round(planned_hours)),
-        "planned_pct": int(round(planned_pct_raw * 100 if planned_pct_raw <= 1 else planned_pct_raw)),
-        "resources": int(round(resources_raw)),
+        "planned_pct": PLANNED_BANDWIDTH_PCT,
+        "resources": resources if resources is not None else 0,
     }
