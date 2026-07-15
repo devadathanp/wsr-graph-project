@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as pe
 import numpy as np
 
 from wsr.constants import DEFAULT_DATA_FILE
@@ -23,7 +24,6 @@ from wsr.graph import (
     to_percentage,
 )
 
-# Reference WSR graph palette (slide 4).
 CHART_BASELINE = "#7ED321"
 CHART_REVISED = "#B8E986"
 CHART_COMPLETED = "#00B050"
@@ -33,56 +33,123 @@ CHART_DRB = "#00B0F0"
 CHART_CONFIDENCE = "#8064A2"
 CHART_ACTUAL = "#7030A0"
 
-# Backward-compatible alias (sheet column name).
 DRB_COLUMN = COL_DRB
 
-# Bar groups that receive numeric labels (index into bar_specs below).
-_LABEL_COMPLETED = 2
-_LABEL_IN_PROGRESS = 4
+
+_LABEL_STROKE = [pe.withStroke(linewidth=2.2, foreground="white")]
 
 
-def _bar_value_labels(ax, bars, *, min_value: float = 1, y_pad: float = 0.8) -> None:
-    """Place a single value above each bar with a small white backing for readability."""
-    for bar in bars:
-        height = bar.get_height()
-        if np.isnan(height) or height < min_value:
-            continue
+def _label_bars(ax, bars_groups, bar_max: float, ylim_top: float) -> None:
+    inside_min = max(bar_max * 0.14, 9)
+    # Keep above-bar numbers out of the top band reserved for % line labels.
+    max_above_y = ylim_top * 0.72
+    n_weeks = len(bars_groups[0]) if bars_groups else 0
+
+    for week_idx in range(n_weeks):
+        above_slot = 0
+        for series_idx, bars in enumerate(bars_groups):
+            bar = bars[week_idx]
+            height = bar.get_height()
+            if np.isnan(height) or height < 0.5:
+                continue
+            x = bar.get_x() + bar.get_width() / 2
+            value = f"{int(round(height))}"
+
+            # Prefer on-bar when tall; otherwise above — but never into the % label band.
+            place_inside = height >= inside_min and (
+                series_idx in (0, 2) or height + max(bar_max * 0.05, 2) > max_above_y
+            )
+            if place_inside:
+                ax.text(
+                    x,
+                    height * 0.48,
+                    value,
+                    ha="center",
+                    va="center",
+                    fontsize=6.5,
+                    color="#161718",
+                    zorder=5,
+                    clip_on=False,
+                    path_effects=_LABEL_STROKE,
+                )
+            else:
+                y_pad = max(bar_max * 0.014, 0.75) + above_slot * max(bar_max * 0.028, 1.2)
+                above_slot += 1
+                y = min(height + y_pad, max_above_y)
+                if y <= height + 0.2:
+                    ax.text(
+                        x,
+                        height * 0.48,
+                        value,
+                        ha="center",
+                        va="center",
+                        fontsize=6.5,
+                        color="#161718",
+                        zorder=5,
+                        clip_on=False,
+                        path_effects=_LABEL_STROKE,
+                    )
+                else:
+                    ax.text(
+                        x,
+                        y,
+                        value,
+                        ha="center",
+                        va="bottom",
+                        fontsize=6.5,
+                        color="#161718",
+                        zorder=5,
+                        clip_on=False,
+                        path_effects=_LABEL_STROKE,
+                    )
+
+
+def _label_percentages(
+    ax,
+    x_positions: np.ndarray,
+    confidence: np.ndarray,
+    actual: np.ndarray,
+    *,
+    y_pad: float = 1.8,
+) -> None:
+    """Anchor each % label to its line point (tiny offset so the glyph sits on the line)."""
+    y_lo, y_hi = ax.get_ylim()
+
+    def _draw(xpos: float, value: float, color: str, above: bool) -> None:
+        if above:
+            y = min(value + y_pad, y_hi - 0.5)
+            va = "bottom"
+        else:
+            y = max(value - y_pad, y_lo + 0.5)
+            va = "top"
         ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            height + y_pad,
-            f"{int(height)}",
+            xpos,
+            y,
+            f"{int(round(value))}%",
             ha="center",
-            va="bottom",
-            fontsize=7.5,
-            color="#161718",
-            bbox={"boxstyle": "round,pad=0.12", "facecolor": "white", "edgecolor": "none", "alpha": 0.9},
-            zorder=5,
+            va=va,
+            fontsize=7,
+            color=color,
+            zorder=6,
             clip_on=False,
+            path_effects=_LABEL_STROKE,
         )
 
+    for index, xpos in enumerate(x_positions):
+        conf = confidence[index] if index < len(confidence) else np.nan
+        act = actual[index] if index < len(actual) else np.nan
+        has_conf = not np.isnan(conf)
+        has_act = not np.isnan(act)
 
-def _changed_value_labels(ax, bars, *, min_value: float = 1) -> None:
-    """Label bars only when the value changes from the previous week."""
-    previous: float | None = None
-    for bar in bars:
-        height = bar.get_height()
-        if np.isnan(height) or height < min_value:
-            previous = height
-            continue
-        if previous is None or height != previous:
-            ax.text(
-                bar.get_x() + bar.get_width() / 2,
-                height + 0.8,
-                f"{int(height)}",
-                ha="center",
-                va="bottom",
-                fontsize=7.5,
-                color="#161718",
-                bbox={"boxstyle": "round,pad=0.12", "facecolor": "white", "edgecolor": "none", "alpha": 0.9},
-                zorder=5,
-                clip_on=False,
-            )
-        previous = height
+        if has_conf and has_act:
+            conf_above = float(conf) >= float(act)
+            _draw(xpos, float(conf), CHART_CONFIDENCE, above=conf_above)
+            _draw(xpos, float(act), CHART_ACTUAL, above=not conf_above)
+        else:
+            if has_conf:
+                _draw(xpos, float(conf), CHART_CONFIDENCE, above=True)
+            if has_act:
+                _draw(xpos, float(act), CHART_ACTUAL, above=False)
 
 
 def _plot_section(
@@ -92,12 +159,12 @@ def _plot_section(
     progress_col: str,
     progress_label: str,
     output_path: str | Path,
-    figsize=(11.8, 4.35),
+    figsize=(13.4, 4.65),
 ) -> Path:
     section = add_week_labels(section)
     x = np.arange(len(section))
-    bar_width = 0.1
-    offsets = (-2.5, -1.5, -0.5, 0.5, 1.5, 2.5)
+    bar_width = 0.105
+    offsets = (-2.6, -1.55, -0.5, 0.55, 1.6, 2.65)
 
     fig, ax1 = plt.subplots(figsize=figsize)
 
@@ -128,26 +195,35 @@ def _plot_section(
             if not np.isnan(height):
                 bar_max = max(bar_max, height)
 
-    ax1.set_ylim(0, max(bar_max * 1.12, bar_max + 6))
-
-    # In-progress is the key weekly metric; completed only when it moves.
-    _bar_value_labels(ax1, bars_groups[_LABEL_IN_PROGRESS], min_value=1)
-    _changed_value_labels(ax1, bars_groups[_LABEL_COMPLETED], min_value=1)
+    ylim_top = max(bar_max * 1.22, bar_max + 10)
+    ax1.set_ylim(0, ylim_top)
+    _label_bars(ax1, bars_groups, bar_max, ylim_top)
 
     ax2 = ax1.twinx()
-    confidence = to_percentage(section[COL_PCT_CONFIDENCE])
-    actual = to_percentage(section[COL_PCT_ACTUAL])
+    confidence = to_percentage(section[COL_PCT_CONFIDENCE]).to_numpy(dtype=float)
+    actual = to_percentage(section[COL_PCT_ACTUAL]).to_numpy(dtype=float)
 
     ax2.plot(x, confidence, color=CHART_CONFIDENCE, linewidth=2.2, label="% Completion Confidence - Overall", zorder=3)
     ax2.plot(x, actual, color=CHART_ACTUAL, linewidth=2.2, label="% Actual weekly completion w.r.t revised Baseline", zorder=3)
-    ax2.set_ylim(0, 120)
+    pct_max = np.nanmax([*confidence, *actual, 100.0])
+    ax2.set_ylim(0, max(120.0, float(pct_max) + 12.0))
+    _label_percentages(ax2, x, confidence, actual)
 
-    ax1.set_title(title, fontsize=15, fontweight="bold", pad=10)
+    ax1.set_title(title, fontdict={"fontsize": 14, "fontweight": "normal"}, pad=6)
     ax1.set_xticks(x)
-    ax1.set_xticklabels(section["Week Label"], fontsize=8.5)
-    ax1.set_ylabel("DCR Count", fontsize=10)
-    ax2.set_ylabel("Percentage", fontsize=10)
-    ax1.grid(axis="y", linestyle="--", alpha=0.3, zorder=0)
+    ax1.set_xticklabels(section["Week Label"], fontsize=8)
+    ax1.set_ylabel("DCR Count", fontsize=9)
+    ax2.set_ylabel("Percentage", fontsize=9)
+    ax1.grid(axis="y", linestyle="--", alpha=0.28, zorder=0)
+
+    for spine in ax1.spines.values():
+        spine.set_visible(False)
+    for spine in ax2.spines.values():
+        spine.set_visible(False)
+    ax1.spines["bottom"].set_visible(True)
+    ax1.spines["bottom"].set_color("#9aa0a6")
+    ax1.tick_params(axis="both", length=0)
+    ax2.tick_params(axis="both", length=0)
 
     handles1, labels1 = ax1.get_legend_handles_labels()
     handles2, labels2 = ax2.get_legend_handles_labels()
@@ -155,15 +231,15 @@ def _plot_section(
         handles1 + handles2,
         labels1 + labels2,
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.2),
+        bbox_to_anchor=(0.5, -0.18),
         ncol=2,
-        fontsize=6.5,
+        fontsize=6,
         frameon=False,
     )
 
-    plt.tight_layout(rect=(0, 0.08, 1, 0.98))
+    plt.tight_layout(rect=(0, 0.07, 1, 0.98))
     output_path = Path(output_path)
-    plt.savefig(output_path, dpi=220, bbox_inches="tight")
+    plt.savefig(output_path, dpi=220, bbox_inches="tight", pad_inches=0.08)
     plt.close(fig)
     return output_path
 
@@ -194,13 +270,17 @@ def save_planning_chart(
     planning: dict[str, int],
     output_path: str | Path,
 ) -> Path:
-    """Quarterly planning bar chart as PNG (avoids native PPT chart repair issues)."""
     categories = ["Q3 Actual Available", f"{planning['planned_pct']}% of Q3 is Planned"]
     values = [planning["available_hours"], planning["planned_hours"]]
 
     fig, ax = plt.subplots(figsize=(11.2, 4.6))
     bars = ax.bar(categories, values, color="#92D050", width=0.45)
-    ax.set_title("PFS Quarterly Planning 2026", fontsize=14, fontweight="bold", color="#161718", pad=12)
+    ax.set_title(
+        "PFS Quarterly Planning 2026",
+        fontdict={"fontsize": 14, "fontweight": "normal"},
+        color="#161718",
+        pad=12,
+    )
     ax.set_ylabel("")
     ax.spines[["top", "right"]].set_visible(False)
     ax.grid(axis="y", linestyle="--", alpha=0.3)

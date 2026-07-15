@@ -28,10 +28,17 @@ def add_title_slide(prs: Presentation, report_date: str) -> None:
 
     title_ph = find_placeholder(slide, idx=0)
     if title_ph is not None:
+        # Keep template vertical position; widen so the CES line stays on one row.
+        title_ph.left = Inches(0.54)
+        title_ph.top = Inches(2.62)
+        title_ph.width = Inches(12.2)
+        title_ph.height = Inches(1.45)
         text_frame = title_ph.text_frame
         text_frame.clear()
+        text_frame.word_wrap = False
+        text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
         line1 = text_frame.paragraphs[0].add_run()
-        line1.text = "CES PFS CSAR (Non- STLA) and CORE 2"
+        line1.text = "CES PFS CSAR (Non-STLA) and CORE 2"
         style_title_run(line1)
         line2 = text_frame.add_paragraph().add_run()
         line2.text = "Weekly Status Report"

@@ -18,15 +18,16 @@ LAYOUT_OPENING = 13
 LAYOUT_CONTENT = 3
 
 # Slide 4 — DCR status charts and right-hand summary panel.
-DCR_CHART_LEFT = 0.08
-DCR_CHART_WIDTH = 9.72
-DCR_EVAL_TOP = 0.95
-DCR_CHART_HEIGHT = 3.2
-DCR_IMPL_TOP = 4.22
-DCR_PANEL_LEFT = 9.85
-DCR_PANEL_WIDTH = 3.2
-DCR_SUMMARY_TOP = 0.95
-DCR_NOTES_GAP = 0.40
+DCR_CHART_LEFT = 0.04
+DCR_CHART_WIDTH = 11.05
+DCR_EVAL_TOP = 0.70
+DCR_CHART_HEIGHT = 3.38
+DCR_IMPL_TOP = 4.12
+DCR_PANEL_LEFT = 11.18
+DCR_PANEL_WIDTH = 2.00
+DCR_SUMMARY_TOP = 0.70
+DCR_NOTES_GAP = 0.65
+DCR_TITLE_TOP = 0.26
 DCR_STATUS_NOTE_LINES = [
     "The initial plan is based on high level estimations and DCRs in KPIT Pune team's bucket as on date.",
     "Revised baseline plan is updated based on reshuffling done during execution in the quarter "

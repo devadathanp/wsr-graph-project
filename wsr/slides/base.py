@@ -77,7 +77,7 @@ def add_summary_key_value_table(
     top: float,
     width: float,
 ) -> float:
-    row_height = 0.32
+    row_height = 0.42
     table_height = row_height * max(len(rows), 1)
     table_shape = slide.shapes.add_table(
         len(rows),
@@ -94,4 +94,5 @@ def add_summary_key_value_table(
         table.cell(row_idx, 0).text = label
         table.cell(row_idx, 1).text = str(value)
     style_key_value_table(table)
-    return top + table_height
+    # Prefer measured shape extent — wrapped cells make the visual table taller.
+    return table_shape.top.inches + table_shape.height.inches + 0.08

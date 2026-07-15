@@ -54,6 +54,8 @@ def build_pending_item(
         "dcr_id": dcr_id,
         "summary": str(summary) if pd.notna(summary) else "-",
         "status": impl_status_from_row(tracker_row),
+        "closure_date": closure_date_from_row(tracker_row, vis_row),
+        "support": support_required_from_row(tracker_row),
         "remarks": latest_comment(tracker_row.get("Comments (Daily)"), max_len=None),
     }
 

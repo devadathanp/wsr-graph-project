@@ -38,8 +38,8 @@ def add_planning_slide(
 
     bandwidth = slide.shapes.add_textbox(Inches(0.59), Inches(5.85), Inches(10.85), Inches(0.40))
     bw_run = bandwidth.text_frame.paragraphs[0].add_run()
-    bw_run.text = f"**Bandwidth is planned with {qp['resources']} Resources"
-    style_body_run(bw_run, bold=True)
+    bw_run.text = f"Bandwidth is planned with {qp['resources']} Resources"
+    style_body_run(bw_run, bold=False)
 
     note = slide.shapes.add_textbox(Inches(0.59), Inches(6.25), Inches(12.18), Inches(0.40))
     note_run = note.text_frame.paragraphs[0].add_run()

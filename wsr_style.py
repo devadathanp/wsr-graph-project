@@ -231,12 +231,10 @@ def style_key_value_table(table) -> None:
                     set_run_font(
                         run,
                         size=Pt(9) if is_label else Pt(9.5),
-                        bold=is_label,
+                        bold=False,
                         color=TEXT_DARK,
                         name=FONT_BODY,
                     )
-                    if is_label:
-                        run.font.bold = True
 
 
 def min_header_column_width(header: str) -> float:

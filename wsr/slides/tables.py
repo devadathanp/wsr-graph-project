@@ -32,18 +32,26 @@ def add_pending_slide(
         ]
         widths = [0.58, 0.9, 3.4, 1.85, 1.45, 3.0]
     else:
-        headers = ["Sr No", "DCR ID", "Summary", "Current Status", "Remarks"]
+        headers = [
+            "Sr No",
+            "DCR ID",
+            "Summary",
+            "Current Status",
+            "Impl Closure Date",
+            "Support Required",
+        ]
         rows = [
             [
                 str(i + 1),
                 str(item["dcr_id"]),
                 item["summary"],
                 item["status"],
-                item["remarks"],
+                item["closure_date"],
+                item["support"],
             ]
             for i, item in enumerate(items)
         ]
-        widths = [0.58, 0.9, 4.4, 2.2, 3.2]
+        widths = [0.58, 0.9, 3.4, 1.85, 1.45, 3.0]
 
     if not rows:
         rows = [empty_row(len(headers))]
@@ -107,19 +115,8 @@ def add_handoff_slide(prs: Presentation, report_date: str, items: list[dict]) ->
 
 
 def add_discussion_slide(prs: Presentation, report_date: str, items: list[dict]) -> None:
+    del items  # Manual content — headers only; body left blank for the team.
     slide = new_content_slide(prs, "Discussion Points", report_date, 9)
     headers = ["#", "Descriptions", "Program", "Priority", "Plan completion dates", "Remarks"]
-    rows = [
-        [
-            str(i + 1),
-            item["description"],
-            item["program"],
-            str(item["priority"]),
-            item["plan_date"],
-            item["remarks"],
-        ]
-        for i, item in enumerate(items)
-    ]
-    if not rows:
-        rows = [empty_row(len(headers))]
+    rows = [[""] * len(headers)]
     add_table(slide, headers, rows, col_widths=[0.42, 3.8, 0.95, 0.9, 1.55, 3.0])

@@ -66,6 +66,27 @@ def format_date(value) -> str:
         return str(value)
 
 
+def _day_ordinal(day: int) -> str:
+    if 11 <= day % 100 <= 13:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    return f"{day}{suffix}"
+
+
+def format_ordinal_day_month(value) -> str:
+    """Format a date as '3rd July' for slide titles."""
+    parsed = pd.to_datetime(value, dayfirst=True)
+    return f"{_day_ordinal(int(parsed.day))} {parsed.strftime('%B')}"
+
+
+def format_quarter_label(value) -> str:
+    """Format a date as Q3'26 for slide titles."""
+    parsed = pd.to_datetime(value, dayfirst=True)
+    quarter = (int(parsed.month) - 1) // 3 + 1
+    return f"Q{quarter}'{parsed.strftime('%y')}"
+
+
 def latest_comment(comments: str | float, max_len: int | None = 120) -> str:
     if pd.isna(comments):
         return "-"

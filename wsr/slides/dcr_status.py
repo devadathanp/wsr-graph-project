@@ -18,9 +18,19 @@ from wsr.constants import (
     DCR_PANEL_WIDTH,
     DCR_STATUS_NOTE_LINES,
     DCR_SUMMARY_TOP,
+    DCR_TITLE_TOP,
 )
 from wsr.slides.base import add_summary_key_value_table, new_content_slide
+from wsr.tracker import format_ordinal_day_month, format_quarter_label
 from wsr_style import FONT_BODY, TEXT_DARK, raise_slide_title, set_run_font
+
+
+def dcr_status_slide_title(report_date: str) -> str:
+    quarter = format_quarter_label(report_date)
+    till = format_ordinal_day_month(report_date)
+    return (
+        f"DCR Status {quarter} - CSAR (Non-STLA) & Core 2 program - PFS (till {till})"
+    )
 
 
 def add_dcr_status_slide(
@@ -32,11 +42,12 @@ def add_dcr_status_slide(
 ) -> None:
     slide = new_content_slide(
         prs,
-        "PFS (Evaluation and Implementation)",
+        dcr_status_slide_title(report_date),
         report_date,
         4,
+        title_size=Pt(18),
     )
-    raise_slide_title(slide)
+    raise_slide_title(slide, top_in=DCR_TITLE_TOP)
 
     slide.shapes.add_picture(
         str(eval_chart),

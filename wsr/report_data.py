@@ -118,60 +118,32 @@ def summary_callouts(data_file: str = DEFAULT_DATA_FILE) -> dict[str, str]:
 
 
 def summary_table_rows(data_file: str = DEFAULT_DATA_FILE) -> list[tuple[str, str]]:
-    """Two-column DCR status summary for slide 4 (values sourced from workbooks)."""
-    planning = load_non_stla_planning(data_file)
-    type_counts = planning_type_counts(planning)
-    status_counts = visibility_status_counts(load_visibility(data_file))
     graph = load_graph_summary(data_file)
 
     eval_baseline = graph.get("eval_baseline")
-    eval_revised = graph.get("eval_revised")
     impl_baseline = graph.get("impl_baseline")
-    impl_revised = graph.get("impl_revised")
 
-    if None not in (eval_baseline, eval_revised, impl_baseline, impl_revised):
-        total_value = (
-            f"{eval_baseline + impl_baseline} >> {eval_revised + impl_revised} "
-            "(Non STLA + Core 2) + ECM Testing"
-        )
+    if eval_baseline is not None and impl_baseline is not None:
+        total_value = str(eval_baseline + impl_baseline)
+        eval_planned = str(eval_baseline)
+        impl_planned = str(impl_baseline)
     else:
-        total_value = f"{len(set(planning_dcr_ids(planning)))} (Non STLA + Core 2) + ECM Testing"
-
-    csar_value = (
-        f"{impl_baseline} >> {impl_revised}"
-        if impl_baseline is not None and impl_revised is not None
-        else "-"
-    )
-    core2_count = core2_planned_count(planning)
-    eval_planned = (
-        f"{eval_baseline} >> {eval_revised}"
-        if eval_baseline is not None and eval_revised is not None
-        else str(type_counts.get("Eval+Impl", 0) + type_counts.get("Eval", 0))
-    )
-    impl_planned = (
-        f"{impl_baseline} >> {impl_revised}"
-        if impl_baseline is not None and impl_revised is not None
-        else str(type_counts.get("Impl", 0) + type_counts.get("Eval+Impl", 0))
-    )
+        planning = load_non_stla_planning(data_file)
+        type_counts = planning_type_counts(planning)
+        eval_planned = str(type_counts.get("Eval+Impl", 0) + type_counts.get("Eval", 0))
+        impl_planned = str(type_counts.get("Impl", 0))
+        total_value = str(int(eval_planned) + int(impl_planned))
 
     return [
         ("Total DCR's planned", total_value),
-        ("CSAR", csar_value),
-        ("Core2", str(core2_count) if core2_count is not None else "-"),
-        ("ECM Testing", str(type_counts.get("ECM_Testing", 0))),
-        ("DDP Testing", str(type_counts.get("DDP", 0))),
+        ("CSAR", ""),
+        ("Core2", ""),
+        ("ECM Testing", ""),
+        ("DDP Testing", ""),
         ("DCR's Planned for Evaluation", eval_planned),
         ("DCR's Planned for Implementation", impl_planned),
-        (
-            "DCR's Rejected",
-            f"Eval: {status_counts['rejected']['eval']:02d}, "
-            f"Impl: {status_counts['rejected']['impl']:02d}",
-        ),
-        (
-            "DCR's Deferred",
-            f"Eval: {status_counts['deferred']['eval']:02d}, "
-            f"Impl: {status_counts['deferred']['impl']:02d}",
-        ),
+        ("DCR's Rejected", "Eval: , Impl: "),
+        ("DCR's Deferred", "Eval: , Impl: "),
     ]
 
 

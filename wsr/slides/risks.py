@@ -16,32 +16,33 @@ def _add_impact_legend(slide) -> None:
     """Risk/issues impact legend with spacing so labels do not overlap."""
     legend_items = [
         (RGBColor(0xFF, 0x00, 0x00), "High Impact / High Possibility"),
-        (RGBColor(0xFF, 0xC0, 0x00), "Medium Impact / Medium Possibility"),
-        (RGBColor(0x92, 0xD0, 0x50), "Low Impact / Low Possibility"),
+        (RGBColor(0xFF, 0xBF, 0x00), "Medium Impact / Medium Possibility"),  # Amber
+        (RGBColor(0x00, 0xB0, 0x50), "Low Impact / Low Possibility"),
     ]
-    square_top = 6.36
+    circle_top = 6.36
     text_top = 6.33
     item_width = 3.95
     gap = 0.35
     start_left = TABLE_LEFT_IN
+    circle_size = 0.24
 
     for index, (color, label) in enumerate(legend_items):
         left = start_left + index * (item_width + gap)
-        square = slide.shapes.add_shape(
-            MSO_SHAPE.RECTANGLE,
+        circle = slide.shapes.add_shape(
+            MSO_SHAPE.OVAL,
             Inches(left),
-            Inches(square_top),
-            Inches(0.22),
-            Inches(0.22),
+            Inches(circle_top),
+            Inches(circle_size),
+            Inches(circle_size),
         )
-        square.fill.solid()
-        square.fill.fore_color.rgb = color
-        square.line.fill.background()
+        circle.fill.solid()
+        circle.fill.fore_color.rgb = color
+        circle.line.fill.background()
 
         box = slide.shapes.add_textbox(
-            Inches(left + 0.3),
+            Inches(left + 0.34),
             Inches(text_top),
-            Inches(item_width - 0.3),
+            Inches(item_width - 0.34),
             Inches(0.34),
         )
         text_frame = box.text_frame
