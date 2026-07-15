@@ -16,10 +16,13 @@ SOURCED FROM data.xlsm and Book2.xlsx
 - Pending eval/impl DCR tables
 - DCR status summary callout boxes
 - DDP MS4-5 slide
-- Eval handoff slide (Non_STLA Planning dates)
-- Discussion points (at-risk DCRs)
 - Charts and graph totals
 - Quarterly planning chart (Book2.xlsx)
+================================================================================
+MANUAL (headers only — filled by the team in PowerPoint)
+================================================================================
+- Eval handoff from onsite (slide 8)
+- Discussion points (slide 9)
 ================================================================================
 """
 

@@ -11,14 +11,13 @@ from pptx import Presentation
 from wsr.charts import save_evaluation_chart, save_implementation_chart, save_planning_chart
 from wsr.constants import DEFAULT_DATA_FILE
 from wsr.graph import latest_reported_week
-from wsr.loaders import load_ddp_plan, load_non_stla_planning, load_tracker, load_visibility
+from wsr.loaders import load_ddp_plan, load_tracker, load_visibility
 from wsr.pending import pending_items, pending_week_for_chart
 from wsr.planning_book import load_quarterly_planning
 from wsr.pptx_sanitize import sanitize_pptx
 from wsr.report_data import (
     ddp_ms45_items,
     discussion_points,
-    eval_handoff_items,
     summary_table_rows,
 )
 from wsr.slides import (
@@ -75,7 +74,6 @@ def generate_report(
     tracker = load_tracker(data_file)
     visibility = load_visibility(data_file)
     ddp = load_ddp_plan(data_file)
-    planning = load_non_stla_planning(data_file)
     tracker_map = tracker_lookup(tracker)
     tracker_rows = tracker_rows_lookup(tracker)
 
@@ -96,8 +94,6 @@ def generate_report(
         cutoff_date=report_date,
     )
     ddp_items = ddp_ms45_items(ddp, tracker_map)
-    handoff_items = eval_handoff_items(planning, tracker_map, report_date)
-    discussion = discussion_points(visibility, tracker_map)
     quarterly_planning = load_quarterly_planning(planning_book_path)
     planning_chart = None
     if quarterly_planning is not None:
@@ -130,8 +126,8 @@ def generate_report(
         mode="implementation",
     )
     add_ddp_slide(prs, report_date, ddp_items)
-    add_handoff_slide(prs, report_date, handoff_items)
-    add_discussion_slide(prs, report_date, discussion)
+    add_handoff_slide(prs, report_date)
+    add_discussion_slide(prs, report_date, [])
     add_risks_slide(prs, report_date)
     add_planning_slide(prs, report_date, quarterly_planning, chart_image=planning_chart)
     add_closing_slide(

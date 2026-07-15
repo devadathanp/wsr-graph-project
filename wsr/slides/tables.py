@@ -94,23 +94,11 @@ def add_ddp_slide(prs: Presentation, report_date: str, items: list[dict]) -> Non
     )
 
 
-def add_handoff_slide(prs: Presentation, report_date: str, items: list[dict]) -> None:
+def add_handoff_slide(prs: Presentation, report_date: str, items: list[dict] | None = None) -> None:
+    del items  # Manual — component owners change; headers only for the team to fill.
     slide = new_content_slide(prs, "Q3-2026 – Eval Handoff from onsite", report_date, 8)
     headers = ["Sr. No.", "DCR ID", "Summary", "Evaluator", "Eval Handoff Date", "Remark"]
-    rows = []
-    for idx, item in enumerate(items, start=1):
-        rows.append(
-            [
-                str(idx),
-                str(item["dcr_id"]),
-                str(item.get("summary", "-")),
-                item.get("evaluator", "-"),
-                item.get("handoff_date", "-"),
-                item.get("remark", "-"),
-            ]
-        )
-    if not rows:
-        rows = [empty_row(len(headers))]
+    rows = [[""] * len(headers)]
     add_table(slide, headers, rows, col_widths=[0.62, 0.9, 3.6, 1.05, 1.55, 2.6])
 
 

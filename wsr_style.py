@@ -22,7 +22,8 @@ TEXT_MUTED = RGBColor(0x4D, 0x51, 0x54)      # dk2
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 SUMMARY_TABLE_FILL = RGBColor(0xC6, 0xE0, 0xB4)
 
-FONT_MAJOR = "Work Sans Medium"
+# Theme fonts: PowerPoint shows these as "Work Sans Medium (Headings)" / "Work Sans (Body)".
+FONT_MAJOR = "+mj-lt"  # Work Sans Medium (Headings)
 FONT_BODY = "Work Sans"
 
 TABLE_STYLE_ID = "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"
@@ -79,7 +80,7 @@ def style_title_run(run):
 
 
 def style_section_title_run(run):
-    set_run_font(run, size=SECTION_TITLE_SIZE, bold=True, color=TEXT_DARK, name=FONT_MAJOR)
+    set_run_font(run, size=SECTION_TITLE_SIZE, bold=False, color=TEXT_DARK, name=FONT_MAJOR)
 
 
 def style_body_run(run, *, bold=False, color=TEXT_DARK):
@@ -182,7 +183,7 @@ def set_slide_title(slide, title: str, *, size=SECTION_TITLE_SIZE):
     title_ph.text = title
     for paragraph in title_ph.text_frame.paragraphs:
         for run in paragraph.runs:
-            set_run_font(run, size=size, bold=True, color=TEXT_DARK, name=FONT_MAJOR)
+            set_run_font(run, size=size, bold=False, color=TEXT_DARK, name=FONT_MAJOR)
 
 
 def content_top_below_title(
