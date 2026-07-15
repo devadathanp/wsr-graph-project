@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 from wsr.constants import DEFAULT_DATA_FILE
+from wsr.errors import WsrDataError
 from wsr.graph import latest_reported_week
 from wsr.pending import pending_week_for_chart
 from wsr.report import generate_report
@@ -50,24 +52,41 @@ def main():
 
     week = args.week
     if week is None:
-        detected_week, _ = latest_reported_week(args.data)
-        week = detected_week
+        try:
+            detected_week, _ = latest_reported_week(args.data)
+            week = detected_week
+        except WsrDataError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
 
-    output = generate_report(
-        output_path=args.output,
-        data_file=args.data,
-        chart_week=args.week,
-        report_date=args.date,
-        assets_dir=args.assets_dir,
-        template_path=args.template,
-        closing_image=args.closing_image,
-        planning_book=args.planning_book,
-    )
-    print(f"Report generated: {output}")
+    try:
+        result = generate_report(
+            output_path=args.output,
+            data_file=args.data,
+            chart_week=args.week,
+            report_date=args.date,
+            assets_dir=args.assets_dir,
+            template_path=args.template,
+            closing_image=args.closing_image,
+            planning_book=args.planning_book,
+        )
+    except WsrDataError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        if getattr(exc, "log_path", None):
+            print(f"Log: {exc.log_path}", file=sys.stderr)
+        return 1
+
+    print(f"Report generated: {result.output_path}")
+    print(f"Log: {result.log_path}")
     print(f"Template: {args.template}")
     if week is not None:
         print(f"Chart week: {week} | Pending tables week: {pending_week_for_chart(week)}")
+    if result.warnings:
+        print(f"Warnings ({len(result.warnings)}):")
+        for warning in result.warnings:
+            print(f"  - {warning}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

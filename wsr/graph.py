@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
 from wsr.constants import DEFAULT_DATA_FILE, GRAPH_SHEET
+from wsr.errors import WsrDataError
 
 COL_WEEK = "Week No"
 COL_DATE = "Date"
@@ -46,11 +49,25 @@ def _safe_int(value) -> int | None:
 
 
 def load_graph_sheet(data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
-    return pd.read_excel(data_file, sheet_name=GRAPH_SHEET, header=2)
+    try:
+        return pd.read_excel(data_file, sheet_name=GRAPH_SHEET, header=2)
+    except ValueError as exc:
+        raise WsrDataError(
+            f'Sheet "{GRAPH_SHEET}" not found or unreadable in {Path(data_file).name}:\n{exc}'
+        ) from exc
+    except Exception as exc:
+        raise WsrDataError(
+            f'Could not read sheet "{GRAPH_SHEET}" in {Path(data_file).name}:\n{exc}'
+        ) from exc
 
 
 def load_graph_summary(data_file: str = DEFAULT_DATA_FILE) -> dict:
-    raw = pd.read_excel(data_file, sheet_name=GRAPH_SHEET, header=None)
+    try:
+        raw = pd.read_excel(data_file, sheet_name=GRAPH_SHEET, header=None)
+    except Exception as exc:
+        raise WsrDataError(
+            f'Could not read sheet "{GRAPH_SHEET}" in {Path(data_file).name}:\n{exc}'
+        ) from exc
     return {
         "eval_baseline": _safe_int(raw.iloc[16, 4]),
         "eval_revised": _safe_int(raw.iloc[16, 5]),
@@ -65,7 +82,16 @@ def get_evaluation_data(df: pd.DataFrame | None = None, data_file: str = DEFAULT
     if df is None:
         df = load_graph_sheet(data_file)
 
+    if "Tagged to Release" not in df.columns:
+        raise WsrDataError(
+            f'Column "Tagged to Release" missing on sheet "{GRAPH_SHEET}".'
+        )
+
     impl_header_idx = df.index[df["Tagged to Release"].astype(str).str.strip() == "Implementation"]
+    if len(impl_header_idx) == 0:
+        raise WsrDataError(
+            f'Could not find the "Implementation" section on sheet "{GRAPH_SHEET}".'
+        )
     eval_df = df.loc[: impl_header_idx[0] - 1]
     section = eval_df[eval_df[COL_WEEK].notna()].copy()
     section.reset_index(drop=True, inplace=True)
@@ -76,10 +102,19 @@ def get_implementation_data(df: pd.DataFrame | None = None, data_file: str = DEF
     if df is None:
         df = load_graph_sheet(data_file)
 
+    if "Tagged to Release" not in df.columns:
+        raise WsrDataError(
+            f'Column "Tagged to Release" missing on sheet "{GRAPH_SHEET}".'
+        )
+
     impl_start_idx = df.index[
         df["Tagged to Release"].astype(str).str.contains("Q3", na=False)
         & df["Tagged to Release"].astype(str).str.contains("Implementation", na=False)
     ]
+    if len(impl_start_idx) == 0:
+        raise WsrDataError(
+            f'Could not find the Q3 Implementation block on sheet "{GRAPH_SHEET}".'
+        )
     section = df.loc[impl_start_idx[0] :]
     section = section[section[COL_WEEK].notna()].copy()
     section.reset_index(drop=True, inplace=True)

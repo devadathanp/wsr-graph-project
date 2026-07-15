@@ -1,6 +1,7 @@
 report_assets/
 *.png
 *.pptx
+*.log
 !templates/*.pptx
 ~$*
 __pycache__/

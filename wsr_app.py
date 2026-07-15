@@ -175,9 +175,12 @@ class WsrApp(tk.Tk):
         output: str,
         report_date: str,
     ) -> None:
-        try:
-            from wsr.report import generate_report
+        from wsr.errors import WsrDataError
+        from wsr.report import generate_report
+        from wsr.run_log import default_log_path
 
+        log_path = default_log_path(Path(output))
+        try:
             assets_dir = Path(tempfile.mkdtemp(prefix="wsr_assets_"))
             result = generate_report(
                 output_path=output,
@@ -185,31 +188,80 @@ class WsrApp(tk.Tk):
                 assets_dir=assets_dir,
                 planning_book=planning,
                 report_date=report_date,
+                log_path=log_path,
             )
-            self.after(0, self._on_success, Path(result))
+            self.after(0, self._on_success, result)
+        except WsrDataError as exc:
+            detail = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+            self.after(
+                0,
+                self._on_failure,
+                str(exc),
+                detail,
+                Path(exc.log_path) if exc.log_path else log_path,
+            )
         except Exception as exc:
             detail = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-            self.after(0, self._on_failure, str(exc), detail)
+            self.after(0, self._on_failure, str(exc), detail, log_path if log_path.exists() else None)
 
-    def _on_success(self, result: Path) -> None:
+    def _on_success(self, result) -> None:
         self.progress.stop()
         self.generate_btn.config(state="normal")
-        self.status_var.set(f"Done: {result}")
-        if messagebox.askyesno(APP_TITLE, f"Report created:\n{result}\n\nOpen it now?"):
-            _reveal(result)
+        if result.warnings:
+            self.status_var.set(
+                f"Done with {len(result.warnings)} warning(s): {result.output_path}"
+            )
+            warning_text = "\n".join(f"• {w}" for w in result.warnings)
+            message = (
+                f"Report created with warnings:\n{result.output_path}\n\n"
+                f"{warning_text}\n\nLog:\n{result.log_path}\n\nOpen the report now?"
+            )
+            if messagebox.askyesno(APP_TITLE, message):
+                _reveal(result.output_path)
+            elif messagebox.askyesno(APP_TITLE, "Open the log file instead?"):
+                _reveal(result.log_path)
+        else:
+            self.status_var.set(f"Done: {result.output_path}")
+            if messagebox.askyesno(APP_TITLE, f"Report created:\n{result.output_path}\n\nOpen it now?"):
+                _reveal(result.output_path)
 
-    def _on_failure(self, message: str, detail: str) -> None:
+    def _on_failure(self, message: str, detail: str, log_path: Path | None) -> None:
         self.progress.stop()
         self.generate_btn.config(state="normal")
-        self.status_var.set("Generation failed.")
+        self.status_var.set("Generation failed. See error details / log.")
+
         dialog = tk.Toplevel(self)
         dialog.title(f"{APP_TITLE} - Error")
-        ttk.Label(dialog, text=message, foreground="#b00020", wraplength=520, padding=12).pack(anchor="w")
-        text = tk.Text(dialog, width=80, height=16, wrap="word")
+        dialog.geometry("640x420")
+
+        ttk.Label(
+            dialog,
+            text=message,
+            foreground="#b00020",
+            wraplength=600,
+            padding=12,
+        ).pack(anchor="w")
+
+        if log_path is not None:
+            ttk.Label(
+                dialog,
+                text=f"Log file:\n{log_path}",
+                wraplength=600,
+                padding=(12, 0, 12, 8),
+            ).pack(anchor="w")
+
+        text = tk.Text(dialog, width=80, height=14, wrap="word")
         text.insert("1.0", detail)
         text.config(state="disabled")
-        text.pack(padx=12, pady=(0, 12))
-        ttk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=(0, 12))
+        text.pack(padx=12, pady=(0, 12), fill="both", expand=True)
+
+        buttons = ttk.Frame(dialog)
+        buttons.pack(pady=(0, 12))
+        if log_path is not None and Path(log_path).exists():
+            ttk.Button(buttons, text="Open log", command=lambda: _reveal(Path(log_path))).pack(
+                side="left", padx=6
+            )
+        ttk.Button(buttons, text="Close", command=dialog.destroy).pack(side="left", padx=6)
 
 
 def main() -> None:
