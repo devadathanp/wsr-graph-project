@@ -41,7 +41,6 @@ _LABEL_STROKE = [pe.withStroke(linewidth=2.2, foreground="white")]
 
 def _label_bars(ax, bars_groups, bar_max: float, ylim_top: float) -> None:
     inside_min = max(bar_max * 0.14, 9)
-    # Keep above-bar numbers out of the top band reserved for % line labels.
     max_above_y = ylim_top * 0.72
     n_weeks = len(bars_groups[0]) if bars_groups else 0
 
@@ -55,7 +54,6 @@ def _label_bars(ax, bars_groups, bar_max: float, ylim_top: float) -> None:
             x = bar.get_x() + bar.get_width() / 2
             value = f"{int(round(height))}"
 
-            # Prefer on-bar when tall; otherwise above — but never into the % label band.
             place_inside = height >= inside_min and (
                 series_idx in (0, 2) or height + max(bar_max * 0.05, 2) > max_above_y
             )
@@ -112,7 +110,6 @@ def _label_percentages(
     *,
     y_pad: float = 1.8,
 ) -> None:
-    """Anchor each % label to its line point (tiny offset so the glyph sits on the line)."""
     y_lo, y_hi = ax.get_ylim()
 
     def _draw(xpos: float, value: float, color: str, above: bool) -> None:

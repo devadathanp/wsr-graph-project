@@ -15,15 +15,13 @@ from wsr.resources import resource_path
 
 DEFAULT_TEMPLATE = resource_path("templates", "CES_CSAR_WSR_Template.pptx")
 
-# Cummins / CES deck palette (from template theme1.xml)
-ACCENT_LIME = RGBColor(0xB0, 0xFF, 0x45)      # accent1
-TEXT_DARK = RGBColor(0x16, 0x17, 0x18)       # dk1
-TEXT_MUTED = RGBColor(0x4D, 0x51, 0x54)      # dk2
+ACCENT_LIME = RGBColor(0xB0, 0xFF, 0x45)
+TEXT_DARK = RGBColor(0x16, 0x17, 0x18)
+TEXT_MUTED = RGBColor(0x4D, 0x51, 0x54)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 SUMMARY_TABLE_FILL = RGBColor(0xC6, 0xE0, 0xB4)
 
-# Theme fonts: PowerPoint shows these as "Work Sans Medium (Headings)" / "Work Sans (Body)".
-FONT_MAJOR = "+mj-lt"  # Work Sans Medium (Headings)
+FONT_MAJOR = "+mj-lt"
 FONT_BODY = "Work Sans"
 
 TABLE_STYLE_ID = "{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"
@@ -48,7 +46,6 @@ CLOSING_HEADLINE_SIZE = Pt(44)
 CLOSING_SUBLINE_SIZE = Pt(20)
 DEFAULT_CLOSING_BACKDROP = resource_path("assets", "closing_backdrop.png")
 
-# Bottom-right footer positions from CES_CSAR reference deck (date, then slide number).
 FOOTER_DATE_LEFT = 11.17
 FOOTER_DATE_TOP = 6.92
 FOOTER_DATE_WIDTH = 1.06

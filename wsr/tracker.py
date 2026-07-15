@@ -19,7 +19,6 @@ def parse_dcr_id(value) -> int | None:
 
 
 def tracker_lookup(tracker: pd.DataFrame) -> dict[int, pd.Series]:
-    """Most recently seen Non STLA row per DCR (backward compatible)."""
     return {dcr_id: rows[-1] for dcr_id, rows in tracker_rows_lookup(tracker).items()}
 
 
@@ -75,13 +74,11 @@ def _day_ordinal(day: int) -> str:
 
 
 def format_ordinal_day_month(value) -> str:
-    """Format a date as '3rd July' for slide titles."""
     parsed = pd.to_datetime(value, dayfirst=True)
     return f"{_day_ordinal(int(parsed.day))} {parsed.strftime('%B')}"
 
 
 def format_quarter_label(value) -> str:
-    """Format a date as Q3'26 for slide titles."""
     parsed = pd.to_datetime(value, dayfirst=True)
     quarter = (int(parsed.month) - 1) // 3 + 1
     return f"Q{quarter}'{parsed.strftime('%y')}"
@@ -284,6 +281,5 @@ def visibility_row(visibility: pd.DataFrame, dcr_id: int) -> pd.Series | None:
     return matches.iloc[0]
 
 
-# Backward-compatible alias used internally.
 _tracker_row_for_mode = tracker_row_for_mode
 _visibility_row = visibility_row

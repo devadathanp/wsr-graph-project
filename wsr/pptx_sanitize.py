@@ -1,13 +1,4 @@
-"""Repair package metadata that triggers PowerPoint's "found a problem" dialog.
-
-Two fixes are applied after python-pptx saves:
-1. Strip SharePoint ``customXml`` and co-authoring ``revisionInfo`` parts copied
-   from the template.
-2. Rewrite ``docProps/app.xml`` so the slide counts and titles match the deck we
-   actually built. python-pptx copies the template's app.xml verbatim, so the
-   stale ``<Slides>``/``<TitlesOfParts>`` values mismatch the real slides and
-   make PowerPoint rebuild (blank) slides on repair.
-"""
+"""Post-save PowerPoint package cleanup."""
 
 from __future__ import annotations
 
@@ -47,7 +38,6 @@ def _clean_content_types(data: bytes) -> bytes:
 
 
 def _extract_title(slide_bytes: bytes) -> str:
-    """Return the title placeholder text of a slide, or a generic fallback."""
     root = etree.fromstring(slide_bytes)
     for sp in root.iter(f"{{{P_NS}}}sp"):
         ph = sp.find(f".//{{{P_NS}}}nvSpPr/{{{P_NS}}}nvPr/{{{P_NS}}}ph")
@@ -59,7 +49,6 @@ def _extract_title(slide_bytes: bytes) -> str:
 
 
 def _rebuild_app_xml(data: bytes, titles: list[str]) -> bytes:
-    """Sync slide counts and TitlesOfParts in app.xml with the actual deck."""
     root = etree.fromstring(data)
     app = f"{{{APP_NS}}}"
     vt = f"{{{VT_NS}}}"

@@ -13,10 +13,9 @@ from wsr_style import TABLE_LEFT_IN, style_body_run
 
 
 def _add_impact_legend(slide) -> None:
-    """Risk/issues impact legend with spacing so labels do not overlap."""
     legend_items = [
         (RGBColor(0xFF, 0x00, 0x00), "High Impact / High Possibility"),
-        (RGBColor(0xFF, 0xBF, 0x00), "Medium Impact / Medium Possibility"),  # Amber
+        (RGBColor(0xFF, 0xBF, 0x00), "Medium Impact / Medium Possibility"),
         (RGBColor(0x00, 0xB0, 0x50), "Low Impact / Low Possibility"),
     ]
     circle_top = 6.36

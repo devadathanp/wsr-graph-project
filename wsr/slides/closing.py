@@ -31,12 +31,10 @@ from wsr_style import (
 
 
 def _send_shape_to_back(shape) -> None:
-    """Move a shape to the back of the slide z-order."""
     sp_tree = shape._element.getparent()
     if sp_tree is None:
         return
     sp_tree.remove(shape._element)
-    # Insert after grpSpPr / nvGrpSpPr (first child is usually group props).
     insert_at = 1 if len(sp_tree) > 0 else 0
     sp_tree.insert(insert_at, shape._element)
 

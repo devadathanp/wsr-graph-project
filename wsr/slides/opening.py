@@ -28,7 +28,6 @@ def add_title_slide(prs: Presentation, report_date: str) -> None:
 
     title_ph = find_placeholder(slide, idx=0)
     if title_ph is not None:
-        # Keep template vertical position; widen so the CES line stays on one row.
         title_ph.left = Inches(0.54)
         title_ph.top = Inches(2.62)
         title_ph.width = Inches(12.2)

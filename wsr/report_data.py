@@ -67,7 +67,6 @@ def visibility_status_counts(visibility: pd.DataFrame) -> dict[str, dict[str, in
 
 
 def summary_callouts(data_file: str = DEFAULT_DATA_FILE) -> dict[str, str]:
-    """Build DCR status summary callout text from planning, graph, and visibility sheets."""
     planning = load_non_stla_planning(data_file)
     visibility = load_visibility(data_file)
     graph = load_graph_summary(data_file)
@@ -257,7 +256,6 @@ def eval_handoff_items(
     report_date: str,
     limit: int = 10,
 ) -> list[dict]:
-    """Eval handoffs whose planning-sheet eval send/completion date falls in the report month."""
     month, year = _report_month_year(report_date)
     dcr_col = planning_dcr_column(planning)
     if dcr_col is None:

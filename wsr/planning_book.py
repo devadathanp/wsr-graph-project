@@ -8,7 +8,6 @@ from openpyxl import load_workbook
 
 from wsr.constants import DEFAULT_PLANNING_BOOK
 
-# Only hardcoded planning input — second bar is this share of Q3 available hours.
 PLANNED_BANDWIDTH_PCT = 90
 
 _AVAILABLE_LABEL = "total work hrs available for pfs team"
@@ -28,22 +27,15 @@ def _normalize_label(value) -> str:
 
 
 def _lookup_available_hours(ws) -> tuple[float | None, int | None]:
-    """Find 'Total work Hrs. Available for PFS team' and the hours in column D.
-
-    The sheet repeats this label (full team, method variants, and headcount
-    splits). The WSR chart uses the PFS-available figure next to the label —
-    among rows that have a team-member count, prefer the largest hours value
-    that is not the full-team total.
-    """
     candidates: list[dict] = []
     for row_idx in range(1, (ws.max_row or 0) + 1):
-        label = ws.cell(row_idx, 2).value  # column B
+        label = ws.cell(row_idx, 2).value
         if not label or _AVAILABLE_LABEL not in _normalize_label(label):
             continue
-        hours = _as_float(ws.cell(row_idx, 4).value)  # column D
+        hours = _as_float(ws.cell(row_idx, 4).value)
         if hours is None:
             continue
-        members = _as_float(ws.cell(row_idx, 9).value)  # column I
+        members = _as_float(ws.cell(row_idx, 9).value)
         candidates.append(
             {
                 "hours": hours,

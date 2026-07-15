@@ -1,30 +1,5 @@
 #!/usr/bin/env python3
-"""
-Generate CES PFS CSAR (Non-STLA) Weekly Status Report (PowerPoint).
-
-Uses templates/CES_CSAR_WSR_Template.pptx for brand fonts (Work Sans), colours, and
-table styles extracted from the reference deck.
-
-================================================================================
-TODO — STRUCTURAL / NARRATIVE SECTIONS (not tabular data from Excel)
-================================================================================
-1. Agenda slide bullets
-2. Closing slide backdrop image path (optional --closing-image)
-================================================================================
-SOURCED FROM data.xlsm and Book2.xlsx
-================================================================================
-- Pending eval/impl DCR tables
-- DCR status summary callout boxes
-- DDP MS4-5 slide
-- Charts and graph totals
-- Quarterly planning chart (Book2.xlsx)
-================================================================================
-MANUAL (headers only — filled by the team in PowerPoint)
-================================================================================
-- Eval handoff from onsite (slide 8)
-- Discussion points (slide 9)
-================================================================================
-"""
+"""Generate CES PFS CSAR (Non-STLA) Weekly Status Report (PowerPoint)."""
 
 from __future__ import annotations
 

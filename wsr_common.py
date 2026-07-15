@@ -1,11 +1,4 @@
-"""
-Backward-compatible re-exports for WSR data helpers.
-
-New code should import from the ``wsr`` package directly, e.g.::
-
-    from wsr.loaders import load_tracker
-    from wsr.pending import pending_items
-"""
+"""Backward-compatible re-exports."""
 
 from wsr.constants import (
     DDP_SHEET,
@@ -60,7 +53,6 @@ from wsr.tracker import (
     visibility_row,
 )
 
-# Legacy private-name aliases.
 _tracker_row_for_mode = tracker_row_for_mode
 _visibility_row = visibility_row
 _build_pending_item = build_pending_item

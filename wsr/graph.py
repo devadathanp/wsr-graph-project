@@ -7,7 +7,6 @@ import pandas as pd
 
 from wsr.constants import DEFAULT_DATA_FILE, GRAPH_SHEET
 
-# Column headers from row 3 of CSAR_WSR_Graph (Non-STLA) — single source of truth for charts.
 COL_WEEK = "Week No"
 COL_DATE = "Date"
 COL_CUMULATIVE_BASELINE = "Cumulative (Baseline Plan)"
@@ -88,7 +87,6 @@ def get_implementation_data(df: pd.DataFrame | None = None, data_file: str = DEF
 
 
 def _coerce_graph_numeric(section: pd.DataFrame) -> pd.DataFrame:
-    """Ensure graph count columns are numeric (as stored in the Excel sheet)."""
     section = section.copy()
     numeric_cols = [
         COL_CUMULATIVE_BASELINE,
@@ -110,12 +108,6 @@ def _coerce_graph_numeric(section: pd.DataFrame) -> pd.DataFrame:
 def latest_reported_week(
     data_file: str = DEFAULT_DATA_FILE,
 ) -> tuple[int | None, str | None]:
-    """Auto-detect the current reporting week and its date from the graph sheet.
-
-    Future weeks only carry the projected baseline plan; the current week is the
-    latest one that has actual weekly-completion data filled in. Returns
-    ``(week_no, "dd-mm-yyyy")`` or ``(None, None)`` when nothing is populated yet.
-    """
     df = load_graph_sheet(data_file)
     week: int | None = None
     date_label: str | None = None

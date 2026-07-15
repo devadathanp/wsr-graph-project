@@ -52,8 +52,6 @@ def generate_report(
     closing_image_path = Path(closing_image) if closing_image else None
     planning_book_path = Path(planning_book) if planning_book else None
 
-    # Auto-detect the current reporting week/date from the scrum workbook when
-    # not supplied, so a one-click run needs no manual input.
     detected_week, detected_date = latest_reported_week(data_file)
     if chart_week is None:
         if detected_week is None:
@@ -77,8 +75,6 @@ def generate_report(
     tracker_map = tracker_lookup(tracker)
     tracker_rows = tracker_rows_lookup(tracker)
 
-    # Slides 5/6: At Risk=On Track, Planned Completion <= report_date;
-    # PRCRState is Evaluate (slide 5) or Implement (slide 6).
     eval_pending = pending_items(
         visibility,
         tracker_rows,

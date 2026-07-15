@@ -13,11 +13,9 @@ PLANNING_SHEET = "Non_STLA (Planning)"
 
 DEFAULT_PLANNING_BOOK = Path(__file__).resolve().parent.parent / "Book2.xlsx"
 
-# PowerPoint slide layout indices (CES CSAR template).
 LAYOUT_OPENING = 13
 LAYOUT_CONTENT = 3
 
-# Slide 4 — DCR status charts and right-hand summary panel.
 DCR_CHART_LEFT = 0.04
 DCR_CHART_WIDTH = 11.05
 DCR_EVAL_TOP = 0.70
@@ -34,7 +32,6 @@ DCR_STATUS_NOTE_LINES = [
     "based on DCR Rejections / moved to next quarter/ dependencies.",
 ]
 
-# Slide 2 — Agenda.
 AGENDA_ITEMS = [
     "MOM & Action Items",
     "DCR Status",

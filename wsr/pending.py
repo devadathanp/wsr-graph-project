@@ -19,7 +19,6 @@ from wsr.tracker import (
 
 PLAN_COMPLETION_COL = "Planned Completion Date\n<dd-mm-yyyy>"
 
-# Slide 5 / 6 tracker filters: PRCRState + At Risk + Planned Completion cutoff.
 _PENDING_PRCR_STATE = {
     "evaluation": "Evaluate",
     "implementation": "Implement",
@@ -68,12 +67,6 @@ def _filtered_pending_items(
     prcr_state: str,
     cutoff_date: pd.Timestamp,
 ) -> list[dict]:
-    """Pending-closure rows filtered from the Non STLA tracker.
-
-    1. PRCRState == ``prcr_state`` (Evaluate for slide 5, Implement for slide 6)
-    2. At Risk == On Track
-    3. Planned Completion Date <= report cutoff date
-    """
     cutoff = pd.Timestamp(cutoff_date).normalize()
     selected: list[tuple[pd.Timestamp, int, pd.Series]] = []
     seen: set[int] = set()
@@ -110,7 +103,7 @@ def pending_items(
     limit: int = PENDING_TABLE_ROW_CAP,
     cutoff_date: pd.Timestamp | str | None = None,
 ) -> list[dict]:
-    del pending_week, limit  # week is slide label only; limit unused after filter rewrite.
+    del pending_week, limit
     mode = mode.lower()
     if mode not in _PENDING_PRCR_STATE:
         raise ValueError(f"Unknown pending mode: {mode}")
@@ -129,7 +122,6 @@ def pending_items(
 
 
 def pending_week_for_chart(chart_week: int) -> int:
-    """Pending-closure table titles use the same week as the charts."""
     return chart_week
 
 

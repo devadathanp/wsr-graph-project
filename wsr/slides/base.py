@@ -94,5 +94,4 @@ def add_summary_key_value_table(
         table.cell(row_idx, 0).text = label
         table.cell(row_idx, 1).text = str(value)
     style_key_value_table(table)
-    # Prefer measured shape extent — wrapped cells make the visual table taller.
     return table_shape.top.inches + table_shape.height.inches + 0.08

@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""
-WSR Generator - desktop app.
-
-A one-click front end for non-technical stakeholders: pick the Scrum workbook
-(and optionally the Planning workbook) and generate the Weekly Status Report
-PowerPoint. No Python knowledge or command line required.
-"""
+"""WSR Generator desktop app."""
 
 from __future__ import annotations
 
@@ -18,9 +12,6 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-# Configure matplotlib for headless rendering to a writable cache BEFORE it is
-# imported anywhere downstream (charts.py). This keeps the packaged .exe working
-# even when the user's home directory is not writable.
 os.environ.setdefault("MPLBACKEND", "Agg")
 os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "wsr_mplcache"))
 
@@ -32,7 +23,6 @@ EXCEL_TYPES = [("Excel workbook", "*.xlsm *.xlsx *.xls"), ("All files", "*.*")]
 
 
 def _reveal(path: Path) -> None:
-    """Open a file (or its containing folder) with the OS default handler."""
     try:
         if sys.platform.startswith("darwin"):
             subprocess.run(["open", str(path)], check=False)
@@ -186,7 +176,6 @@ class WsrApp(tk.Tk):
         report_date: str,
     ) -> None:
         try:
-            # Imported here so the window appears instantly and env vars above apply.
             from wsr.report import generate_report
 
             assets_dir = Path(tempfile.mkdtemp(prefix="wsr_assets_"))
@@ -198,7 +187,7 @@ class WsrApp(tk.Tk):
                 report_date=report_date,
             )
             self.after(0, self._on_success, Path(result))
-        except Exception as exc:  # surfaced to the user in a dialog
+        except Exception as exc:
             detail = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
             self.after(0, self._on_failure, str(exc), detail)
 

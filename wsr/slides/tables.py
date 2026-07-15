@@ -95,7 +95,7 @@ def add_ddp_slide(prs: Presentation, report_date: str, items: list[dict]) -> Non
 
 
 def add_handoff_slide(prs: Presentation, report_date: str, items: list[dict] | None = None) -> None:
-    del items  # Manual — component owners change; headers only for the team to fill.
+    del items
     slide = new_content_slide(prs, "Q3-2026 – Eval Handoff from onsite", report_date, 8)
     headers = ["Sr. No.", "DCR ID", "Summary", "Evaluator", "Eval Handoff Date", "Remark"]
     rows = [[""] * len(headers)]
@@ -103,7 +103,7 @@ def add_handoff_slide(prs: Presentation, report_date: str, items: list[dict] | N
 
 
 def add_discussion_slide(prs: Presentation, report_date: str, items: list[dict]) -> None:
-    del items  # Manual content — headers only; body left blank for the team.
+    del items
     slide = new_content_slide(prs, "Discussion Points", report_date, 9)
     headers = ["#", "Descriptions", "Program", "Priority", "Plan completion dates", "Remarks"]
     rows = [[""] * len(headers)]
