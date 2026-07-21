@@ -1,4 +1,13 @@
-"""Assemble all slides into a PowerPoint presentation."""
+"""
+Assemble all WSR slides into one PowerPoint.
+
+This is where slide order is defined. Each add_*_slide() function lives under
+wsr/slides/ and is responsible for ONE slide's layout.
+
+Automation notes for stakeholders:
+  Automated:     1, 2, 4, 5, 6, 11, 12
+  Manual body:   3 (MOM), 7 (DDP), 8 (handoff), 9 (discussion), 10 (risks body)
+"""
 
 from __future__ import annotations
 
@@ -8,7 +17,7 @@ from pptx import Presentation
 
 from wsr.pending import pending_items
 from wsr.report.models import ChartAssets, ReportTiming, ScrumWorkbook
-from wsr.report_data import ddp_ms45_items, summary_table_rows
+from wsr.report_data import summary_table_rows
 from wsr.run_log import RunLog
 from wsr.slides import (
     add_agenda_slide,
@@ -53,9 +62,6 @@ def build_presentation(
     )
     log.info(f"Pending eval rows: {len(eval_pending)}; impl rows: {len(impl_pending)}")
 
-    ddp_items = ddp_ms45_items(workbook.ddp, workbook.tracker_map)
-    log.info(f"DDP MS4-5 rows: {len(ddp_items)}")
-
     summary_rows = summary_table_rows(str(workbook.path))
 
     log.info("Assembling PowerPoint…")
@@ -85,9 +91,9 @@ def build_presentation(
         impl_pending,
         mode="implementation",
     )
-    add_ddp_slide(prs, report_date, ddp_items)
+    add_ddp_slide(prs, report_date)
     add_handoff_slide(prs, report_date)
-    add_discussion_slide(prs, report_date, [])
+    add_discussion_slide(prs, report_date)
     add_risks_slide(prs, report_date)
     add_planning_slide(
         prs,

@@ -44,11 +44,21 @@ def main():
         help="Quarterly planning workbook for slide 11 (default: ./Book2.xlsx)",
     )
     parser.add_argument(
+        "--planned-pct",
+        type=int,
+        default=90,
+        help="Percent of available quarter hours that are planned (slide 11; default: 90)",
+    )
+    parser.add_argument(
         "--template",
         default=str(DEFAULT_TEMPLATE),
         help="Branded PowerPoint template (default: templates/CES_CSAR_WSR_Template.pptx)",
     )
     args = parser.parse_args()
+
+    if not 1 <= args.planned_pct <= 100:
+        print("Error: --planned-pct must be between 1 and 100.", file=sys.stderr)
+        return 1
 
     week = args.week
     if week is None:
@@ -69,6 +79,7 @@ def main():
             template_path=args.template,
             closing_image=args.closing_image,
             planning_book=args.planning_book,
+            planned_pct=args.planned_pct,
         )
     except WsrDataError as exc:
         print(f"Error: {exc}", file=sys.stderr)

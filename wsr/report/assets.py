@@ -15,6 +15,8 @@ def build_chart_assets(
     assets_dir: Path,
     planning_book_path: Path | None,
     log: RunLog,
+    *,
+    planned_pct: int = 90,
 ) -> ChartAssets:
     log.info("Building charts…")
     impl_chart = save_implementation_chart(
@@ -26,7 +28,10 @@ def build_chart_assets(
         data_file=str(scrum_path),
     )
 
-    quarterly_planning = load_quarterly_planning(planning_book_path)
+    quarterly_planning = load_quarterly_planning(
+        planning_book_path,
+        planned_pct=planned_pct,
+    )
     planning_chart = None
     if quarterly_planning is None:
         if planning_book_path is not None:
@@ -41,7 +46,8 @@ def build_chart_assets(
         )
         log.info(
             f"Planning chart: available={quarterly_planning['available_hours']}, "
-            f"planned={quarterly_planning['planned_hours']}, "
+            f"planned={quarterly_planning['planned_hours']} "
+            f"({quarterly_planning['planned_pct']}% of available), "
             f"resources={quarterly_planning['resources']}"
         )
 

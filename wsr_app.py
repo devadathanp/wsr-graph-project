@@ -45,6 +45,7 @@ class WsrApp(tk.Tk):
         self.planning_var = tk.StringVar()
         self.output_var = tk.StringVar()
         self.date_var = tk.StringVar(value=datetime.now().strftime("%d-%m-%Y"))
+        self.planned_pct_var = tk.StringVar(value="90")
         self.status_var = tk.StringVar(value="Select your Scrum workbook to begin.")
 
         self._build_ui()
@@ -68,22 +69,33 @@ class WsrApp(tk.Tk):
         date_entry.grid(row=5, column=1, sticky="we", padx=8, pady=4)
         ttk.Label(self, text="dd-mm-yyyy").grid(row=5, column=2, sticky="w", pady=4)
 
+        ttk.Label(self, text="What % of Quarter is planned?").grid(
+            row=6, column=0, sticky="w", pady=4
+        )
+        pct_entry = ttk.Entry(self, textvariable=self.planned_pct_var, width=48)
+        pct_entry.grid(row=6, column=1, sticky="we", padx=8, pady=4)
+        ttk.Label(self, text="e.g. 90").grid(row=6, column=2, sticky="w", pady=4)
+
         hint = ttk.Label(
             self,
-            text="Used on slides and as the Planned Completion cutoff for pending tables (slides 5–6).",
+            text=(
+                "Report date is used on slides and as the Planned Completion cutoff "
+                "for pending tables (slides 5–6). Planned % drives the slide 11 bar "
+                "(planned hours = this % of available hours from the Planning workbook)."
+            ),
             foreground="#666",
             wraplength=460,
         )
-        hint.grid(row=6, column=0, columnspan=3, sticky="w", pady=(0, 8))
+        hint.grid(row=7, column=0, columnspan=3, sticky="w", pady=(0, 8))
 
         self.progress = ttk.Progressbar(self, mode="indeterminate", length=420)
-        self.progress.grid(row=7, column=0, columnspan=3, sticky="we", pady=(6, 4))
+        self.progress.grid(row=8, column=0, columnspan=3, sticky="we", pady=(6, 4))
 
         self.status = ttk.Label(self, textvariable=self.status_var, foreground="#333", wraplength=460)
-        self.status.grid(row=8, column=0, columnspan=3, sticky="w")
+        self.status.grid(row=9, column=0, columnspan=3, sticky="w")
 
         self.generate_btn = ttk.Button(self, text="Generate WSR", command=self._on_generate)
-        self.generate_btn.grid(row=9, column=0, columnspan=3, sticky="e", pady=(14, 0))
+        self.generate_btn.grid(row=10, column=0, columnspan=3, sticky="e", pady=(14, 0))
 
         self.columnconfigure(1, weight=1)
 
@@ -153,6 +165,23 @@ class WsrApp(tk.Tk):
                 "Report date must be in dd-mm-yyyy format (e.g. 09-07-2026).",
             )
             return
+
+        planned_pct_raw = self.planned_pct_var.get().strip().rstrip("%")
+        try:
+            planned_pct = int(float(planned_pct_raw))
+        except ValueError:
+            messagebox.showerror(
+                APP_TITLE,
+                "Planned quarter % must be a number (e.g. 90).",
+            )
+            return
+        if not 1 <= planned_pct <= 100:
+            messagebox.showerror(
+                APP_TITLE,
+                "Planned quarter % must be between 1 and 100.",
+            )
+            return
+
         output = self.output_var.get().strip() or str(Path(scrum).parent / self._default_output_name())
         self.output_var.set(output)
         planning = self.planning_var.get().strip() or None
@@ -163,7 +192,7 @@ class WsrApp(tk.Tk):
 
         thread = threading.Thread(
             target=self._run_generation,
-            args=(scrum, planning, output, report_date),
+            args=(scrum, planning, output, report_date, planned_pct),
             daemon=True,
         )
         thread.start()
@@ -174,6 +203,7 @@ class WsrApp(tk.Tk):
         planning: str | None,
         output: str,
         report_date: str,
+        planned_pct: int,
     ) -> None:
         from wsr.errors import WsrDataError
         from wsr.report import generate_report
@@ -188,6 +218,7 @@ class WsrApp(tk.Tk):
                 assets_dir=assets_dir,
                 planning_book=planning,
                 report_date=report_date,
+                planned_pct=planned_pct,
                 log_path=log_path,
             )
             self.after(0, self._on_success, result)

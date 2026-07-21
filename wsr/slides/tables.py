@@ -1,4 +1,11 @@
-"""Data table slides: pending DCRs, DDP, handoff, and discussion."""
+"""
+Data table slides: pending DCRs (5–6), DDP (7), handoff (8), discussion (9).
+
+MANUAL vs AUTOMATED
+-------------------
+  Slide 5 / 6 → rows come from Excel (automated)
+  Slide 7 / 8 / 9 → headers only, blank body (manual fill in PPT)
+"""
 
 from __future__ import annotations
 
@@ -59,7 +66,9 @@ def add_pending_slide(
     add_table(slide, headers, rows, col_widths=widths)
 
 
-def add_ddp_slide(prs: Presentation, report_date: str, items: list[dict]) -> None:
+def add_ddp_slide(prs: Presentation, report_date: str, items: list[dict] | None = None) -> None:
+    """Slide 7 — headers only; body filled manually in PowerPoint."""
+    del items
     slide = new_content_slide(prs, "PFS DDP Details MS 4-5", report_date, 7)
     headers = [
         "Sr.No",
@@ -71,21 +80,7 @@ def add_ddp_slide(prs: Presentation, report_date: str, items: list[dict]) -> Non
         "Dependencies",
         "Remarks",
     ]
-    rows = [
-        [
-            str(item["sr_no"]),
-            item["dcr_id"],
-            item["summary"],
-            item["plan_date"],
-            item["appeared_date"],
-            item["program"],
-            item.get("dependencies", "-"),
-            item["remarks"],
-        ]
-        for item in items
-    ]
-    if not rows:
-        rows = [empty_row(len(headers))]
+    rows = [[""] * len(headers)]
     add_table(
         slide,
         headers,
@@ -102,7 +97,7 @@ def add_handoff_slide(prs: Presentation, report_date: str, items: list[dict] | N
     add_table(slide, headers, rows, col_widths=[0.62, 0.9, 3.6, 1.05, 1.55, 2.6])
 
 
-def add_discussion_slide(prs: Presentation, report_date: str, items: list[dict]) -> None:
+def add_discussion_slide(prs: Presentation, report_date: str, items: list[dict] | None = None) -> None:
     del items
     slide = new_content_slide(prs, "Discussion Points", report_date, 9)
     headers = ["#", "Descriptions", "Program", "Priority", "Plan completion dates", "Remarks"]

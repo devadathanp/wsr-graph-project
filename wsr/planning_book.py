@@ -1,4 +1,14 @@
-"""Quarterly planning metrics from Book2.xlsx (slide 11)."""
+"""
+Quarterly planning metrics from Book2.xlsx (slide 11).
+
+Looks for a row labelled roughly:
+  "Total work Hrs. Available for PFS team"
+
+Then computes:
+  available_hours  = that cell
+  planned_hours     = planned_pct% of available  (from GUI / CLI, default 90)
+  resources         = team size from column I when present
+"""
 
 from __future__ import annotations
 
@@ -8,7 +18,10 @@ from openpyxl import load_workbook
 
 from wsr.constants import DEFAULT_PLANNING_BOOK
 
-PLANNED_BANDWIDTH_PCT = 90
+# Default when the user does not override (GUI / CLI).
+DEFAULT_PLANNED_BANDWIDTH_PCT = 90
+# Backward-compatible alias
+PLANNED_BANDWIDTH_PCT = DEFAULT_PLANNED_BANDWIDTH_PCT
 
 _AVAILABLE_LABEL = "total work hrs available for pfs team"
 
@@ -58,7 +71,11 @@ def _lookup_available_hours(ws) -> tuple[float | None, int | None]:
     return best["hours"], best["members"]
 
 
-def load_quarterly_planning(planning_book: str | Path | None = None) -> dict[str, int] | None:
+def load_quarterly_planning(
+    planning_book: str | Path | None = None,
+    *,
+    planned_pct: int = DEFAULT_PLANNED_BANDWIDTH_PCT,
+) -> dict[str, int] | None:
     workbook_path = Path(planning_book) if planning_book else DEFAULT_PLANNING_BOOK
     if not workbook_path.exists():
         return None
@@ -70,11 +87,11 @@ def load_quarterly_planning(planning_book: str | Path | None = None) -> dict[str
     if available_hours is None:
         return None
 
-    planned_hours = available_hours * (PLANNED_BANDWIDTH_PCT / 100.0)
+    planned_hours = available_hours * (planned_pct / 100.0)
 
     return {
         "available_hours": int(round(available_hours)),
         "planned_hours": int(round(planned_hours)),
-        "planned_pct": PLANNED_BANDWIDTH_PCT,
+        "planned_pct": int(planned_pct),
         "resources": resources if resources is not None else 0,
     }

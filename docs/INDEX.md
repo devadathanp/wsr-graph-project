@@ -38,6 +38,7 @@ what “success” vs “warning” vs “error” looks like.
 | --- | --- | --- |
 | Scrum workbook | `SCRUM_PFS_….xlsm` | Charts, pending DCRs, DDP, tracker, visibility |
 | Planning workbook | `Book2.xlsx` | Quarterly planning slide (optional) |
+| Planned quarter % | GUI field (default 90) | Slide 11: planned hours = this % of available |
 | PPT template | bundled in the app | Branding / layouts |
 
 | Output | Role |
@@ -62,7 +63,7 @@ others are headers-only for humans to edit in PowerPoint.
 | 4 | DCR status (charts + summary) | Auto |
 | 5 | Pending evaluation | Auto |
 | 6 | Pending implementation | Auto |
-| 7 | DDP MS4-5 | Auto |
+| 7 | DDP MS4-5 | Header only (manual) |
 | 8 | Eval handoff | Header only (manual) |
 | 9 | Discussion | Header only (manual) |
 | 10 | Risks | Header + legend; body manual |
@@ -133,7 +134,8 @@ Examples already encoded:
   planned completion ≤ report date.
 - **Summary (slide 4):** baseline totals (e.g. 130 / 50 / 80); some labels left blank
   by design.
-- **DDP (slide 7):** prefer MS4 / 4-5 status rows.
+- **DDP (slide 7):** headers only — filled manually in PowerPoint (row builder in
+  `report_data/ddp.py` kept for optional future use).
 - **Columns:** matched by **name** (exact header text), not column letter — with one
   planning-sheet fallback to column index.
 
@@ -212,7 +214,8 @@ Windows exe locally: `pyinstaller --noconfirm WSR-Generator.spec`.
 - No auto-update / no version badge in the window yet
 - GitHub vs GitLab distribution mismatch for the team
 - SharePoint versioning / upload (mentor idea — awaiting approval)
-- Handoff / discussion automation exists in code but slides left manual by design
+- Handoff / discussion / DDP automation exists in `report_data/` but those slides
+  are left manual by design (headers only)
 
 **Will expand when decisions land.**
 
