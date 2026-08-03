@@ -79,8 +79,6 @@ def _generate_report(
 
     log.info(f"Output: {output_path}")
     log.info(f"Report date arg: {report_date!r}; chart week arg: {chart_week!r}")
-    log.info(f"Planned quarter %: {planned_pct}")
-
     scrum_path = validate_scrum_workbook(data_file, log)
     planning_book_path = validate_planning_book(planning_book, log)
 
@@ -97,6 +95,7 @@ def _generate_report(
         planning_book_path,
         log,
         planned_pct=planned_pct,
+        tracker=workbook.tracker,
     )
     prs = build_presentation(
         template_path=Path(template_path),

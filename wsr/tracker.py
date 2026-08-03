@@ -53,16 +53,48 @@ def tracker_row_for_mode(
     return rows[-1]
 
 
-def format_date(value) -> str:
-    if pd.isna(value) or value in (0, "0"):
+def format_date_fragment(value) -> str:
+    """Format a single date fragment (no newlines). Keep day-month-only as typed."""
+    if value is None:
         return "-"
+    try:
+        if pd.isna(value) or value in (0, "0"):
+            return "-"
+    except (TypeError, ValueError):
+        pass
     if isinstance(value, pd.Timestamp):
         return value.strftime("%d-%b-%Y")
+    text = str(value).strip()
+    if not text or text.lower() in ("nan", "nat", "none"):
+        return "-"
     try:
         parsed = pd.to_datetime(value, dayfirst=True)
-        return parsed.strftime("%d-%b-%Y")
     except (TypeError, ValueError):
-        return str(value)
+        return text
+    # "3-Jun" / "16-Jun" parse as year 0001 — keep Excel fragment.
+    if parsed.year < 1900:
+        return text
+    return parsed.strftime("%d-%b-%Y")
+
+
+def format_date(value) -> str:
+    if value is None:
+        return "-"
+    try:
+        if pd.isna(value) or value in (0, "0"):
+            return "-"
+    except (TypeError, ValueError):
+        pass
+    # Keep every line when Excel has struck-through + replacement dates.
+    if isinstance(value, str) and ("\n" in value or "_x000B_" in value):
+        parts = [
+            part.strip()
+            for part in value.replace("_x000B_", "\n").split("\n")
+            if part.strip()
+        ]
+        if len(parts) > 1:
+            return "\n".join(format_date_fragment(part) for part in parts)
+    return format_date_fragment(value)
 
 
 def _day_ordinal(day: int) -> str:

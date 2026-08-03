@@ -1,34 +1,44 @@
 """
-Quarterly planning metrics from Book2.xlsx (slide 11).
+Quarterly planning metrics for the planning slide.
 
-Looks for a row labelled roughly:
-  "Total work Hrs. Available for PFS team"
+Bar 1 — Q3 Actual Available hours from Book2.xlsx
+  (row labelled "Total work Hrs. Available for PFS team").
 
-Then computes:
-  available_hours  = that cell
-  planned_hours     = planned_pct% of available  (from GUI / CLI, default 90)
-  resources         = team size from column I when present
+Bar 2 — Sum of Scrum Non STLA effort hours:
+  - Prefer ``Revised Estimation`` when that cell has a value.
+  - Otherwise use ``Estimated Hrs``.
+  - If the Revised Estimation column is missing entirely, sum Estimated Hrs only.
+
+Bar 3 — Burndown:
+  sum(Actual Efforts (Hrs)) − sum(Competency Gap Efforts).
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
 from openpyxl import load_workbook
 
 from wsr.constants import DEFAULT_PLANNING_BOOK
 
-# Default when the user does not override (GUI / CLI).
+# Kept for CLI/API compatibility; no longer drives the second planning bar.
 DEFAULT_PLANNED_BANDWIDTH_PCT = 90
-# Backward-compatible alias
 PLANNED_BANDWIDTH_PCT = DEFAULT_PLANNED_BANDWIDTH_PCT
 
 _AVAILABLE_LABEL = "total work hrs available for pfs team"
+
+COL_ESTIMATED_HRS = "Estimated Hrs"
+COL_REVISED_ESTIMATION = "Revised Estimation"
+COL_ACTUAL_EFFORTS = "Actual Efforts (Hrs)"
+COL_COMPETENCY_GAP = "Competency Gap Efforts"
 
 
 def _as_float(value) -> float | None:
     try:
         if value in (None, ""):
+            return None
+        if isinstance(value, float) and value != value:  # NaN
             return None
         return float(value)
     except (TypeError, ValueError):
@@ -71,11 +81,76 @@ def _lookup_available_hours(ws) -> tuple[float | None, int | None]:
     return best["hours"], best["members"]
 
 
+def row_estimated_hours(row: pd.Series) -> float | None:
+    """
+    Hours for one tracker row.
+
+    Revised Estimation wins when present; otherwise Estimated Hrs.
+    """
+    estimated = _as_float(row.get(COL_ESTIMATED_HRS)) if COL_ESTIMATED_HRS in row.index else None
+    if COL_REVISED_ESTIMATION not in row.index:
+        return estimated
+    revised = _as_float(row.get(COL_REVISED_ESTIMATION))
+    if revised is not None:
+        return revised
+    return estimated
+
+
+def sum_scrum_estimated_hours(tracker: pd.DataFrame | None) -> int | None:
+    """Sum per-row estimated hours (revised when present) across the Scrum tracker."""
+    if tracker is None or tracker.empty:
+        return None
+    if COL_ESTIMATED_HRS not in tracker.columns and COL_REVISED_ESTIMATION not in tracker.columns:
+        return None
+
+    total = 0.0
+    saw_any = False
+    for _, row in tracker.iterrows():
+        hours = row_estimated_hours(row)
+        if hours is None:
+            continue
+        total += hours
+        saw_any = True
+    if not saw_any:
+        return 0
+    return int(round(total))
+
+
+def _sum_column(tracker: pd.DataFrame, column: str) -> float:
+    if column not in tracker.columns:
+        return 0.0
+    total = 0.0
+    for value in tracker[column]:
+        hours = _as_float(value)
+        if hours is not None:
+            total += hours
+    return total
+
+
+def sum_burndown_hours(tracker: pd.DataFrame | None) -> int | None:
+    """Actual Efforts (Hrs) minus Competency Gap Efforts across the tracker."""
+    if tracker is None or tracker.empty:
+        return None
+    if COL_ACTUAL_EFFORTS not in tracker.columns and COL_COMPETENCY_GAP not in tracker.columns:
+        return None
+    actual = _sum_column(tracker, COL_ACTUAL_EFFORTS)
+    gap = _sum_column(tracker, COL_COMPETENCY_GAP)
+    return int(round(actual - gap))
+
+
 def load_quarterly_planning(
     planning_book: str | Path | None = None,
     *,
     planned_pct: int = DEFAULT_PLANNED_BANDWIDTH_PCT,
+    tracker: pd.DataFrame | None = None,
 ) -> dict[str, int] | None:
+    """
+    Build the three planning-bar metrics.
+
+    ``planned_pct`` is ignored for the second bar (kept for call-site compatibility).
+    """
+    del planned_pct  # second bar is Scrum estimates, not % of available
+
     workbook_path = Path(planning_book) if planning_book else DEFAULT_PLANNING_BOOK
     if not workbook_path.exists():
         return None
@@ -87,11 +162,23 @@ def load_quarterly_planning(
     if available_hours is None:
         return None
 
-    planned_hours = available_hours * (planned_pct / 100.0)
+    estimated_hours = sum_scrum_estimated_hours(tracker)
+    if estimated_hours is None:
+        estimated_hours = 0
+
+    burndown_hours = sum_burndown_hours(tracker)
+    if burndown_hours is None:
+        burndown_hours = 0
+
+    available = int(round(available_hours))
+    planned_pct = int(round((estimated_hours / available) * 100)) if available else 0
 
     return {
-        "available_hours": int(round(available_hours)),
-        "planned_hours": int(round(planned_hours)),
-        "planned_pct": int(planned_pct),
+        "available_hours": available,
+        # Second bar value (legacy key name kept for slide/chart callers).
+        "planned_hours": int(estimated_hours),
+        "estimated_hours": int(estimated_hours),
+        "burndown_hours": int(burndown_hours),
+        "planned_pct": planned_pct,
         "resources": resources if resources is not None else 0,
     }

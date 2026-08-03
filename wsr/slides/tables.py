@@ -131,8 +131,20 @@ def add_handoff_slide(
     *,
     slide_number: int = 8,
 ) -> None:
-    del items
+    """Eval Handoff from onsite — Onsite Evaluator = Yes."""
     slide = new_content_slide(prs, "Q3-2026 – Eval Handoff from onsite", report_date, slide_number)
     headers = ["Sr. No.", "DCR ID", "Summary", "Evaluator", "Eval Handoff Date", "Remark"]
-    rows = [[""] * len(headers)]
+    rows = [
+        [
+            str(i + 1),
+            str(item.get("dcr_id", "")),
+            item.get("summary", ""),
+            item.get("evaluator", ""),
+            item.get("handoff_date", ""),
+            item.get("remark", ""),
+        ]
+        for i, item in enumerate(items or [])
+    ]
+    if not rows:
+        rows = [empty_row(len(headers))]
     add_table(slide, headers, rows, col_widths=[0.62, 0.9, 3.6, 1.05, 1.55, 2.6])

@@ -5,8 +5,8 @@ This is where slide order is defined. Each add_*_slide() function lives under
 wsr/slides/ and is responsible for ONE slide's layout.
 
 Automation notes for stakeholders:
-  Automated:     1, 2, 3, 4, 5, 6, 7, 9, 10, 11
-  Manual body:   8 (handoff)
+  Automated:     1–11 (handoff from Onsite Evaluator = Yes)
+  Manual body:   (none currently)
 """
 
 from __future__ import annotations
@@ -15,11 +15,13 @@ from pathlib import Path
 
 from pptx import Presentation
 
+from wsr.constants import TRACKER_SHEET
 from wsr.pending import pending_items
 from wsr.report.models import ChartAssets, ReportTiming, ScrumWorkbook
 from wsr.report_data import summary_table_rows
 from wsr.report_data.action_items import action_items
 from wsr.report_data.ddp import ddp_ms45_items
+from wsr.report_data.handoff import eval_handoff_items
 from wsr.report_data.risks import active_risk_items
 from wsr.run_log import RunLog
 from wsr.slides import (
@@ -67,8 +69,13 @@ def build_presentation(
     risk_items = active_risk_items(workbook.risks)
     log.info(f"Active risk rows (open/pending/in progress): {len(risk_items)}")
 
-    ddp_items = ddp_ms45_items(workbook.tracker)
+    tracker_rich = workbook.rich_runs.get(TRACKER_SHEET, {})
+
+    ddp_items = ddp_ms45_items(workbook.tracker, rich_runs=tracker_rich)
     log.info(f"Active DDP MS4-5 rows (testing needed, not closed): {len(ddp_items)}")
+
+    handoff_items = eval_handoff_items(workbook.tracker, rich_runs=tracker_rich)
+    log.info(f"Eval handoff rows (Onsite Evaluator = Yes): {len(handoff_items)}")
 
     action_item_rows = action_items(workbook.action_items)
     log.info(
@@ -114,7 +121,7 @@ def build_presentation(
 
     add_ddp_slide(prs, report_date, ddp_items, slide_number=slide_no)
     slide_no += 1
-    add_handoff_slide(prs, report_date, slide_number=slide_no)
+    add_handoff_slide(prs, report_date, handoff_items, slide_number=slide_no)
     slide_no += 1
     add_risks_slide(prs, report_date, risk_items, slide_number=slide_no)
     slide_no += 1

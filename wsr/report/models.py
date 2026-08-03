@@ -32,6 +32,10 @@ class ScrumWorkbook:
     action_items: pd.DataFrame
     tracker_map: dict[int, pd.Series]
     tracker_rows: dict[int, list[pd.Series]]
+    # sheet -> (excel_row, column_header) -> rich-text runs with strike flags
+    rich_runs: dict[str, dict[tuple[int, str], list[tuple[str, bool]]]] = field(
+        default_factory=dict
+    )
 
 
 @dataclass

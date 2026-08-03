@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
+
 from wsr.charts import save_evaluation_chart, save_implementation_chart, save_planning_chart
 from wsr.planning_book import load_quarterly_planning
 from wsr.report.models import ChartAssets
@@ -17,6 +19,7 @@ def build_chart_assets(
     log: RunLog,
     *,
     planned_pct: int = 90,
+    tracker: pd.DataFrame | None = None,
 ) -> ChartAssets:
     log.info("Building charts…")
     impl_chart = save_implementation_chart(
@@ -31,6 +34,7 @@ def build_chart_assets(
     quarterly_planning = load_quarterly_planning(
         planning_book_path,
         planned_pct=planned_pct,
+        tracker=tracker,
     )
     planning_chart = None
     if quarterly_planning is None:
@@ -46,8 +50,9 @@ def build_chart_assets(
         )
         log.info(
             f"Planning chart: available={quarterly_planning['available_hours']}, "
-            f"planned={quarterly_planning['planned_hours']} "
+            f"estimated_hrs={quarterly_planning['estimated_hours']} "
             f"({quarterly_planning['planned_pct']}% of available), "
+            f"burndown={quarterly_planning['burndown_hours']}, "
             f"resources={quarterly_planning['resources']}"
         )
 

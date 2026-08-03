@@ -1,83 +1,97 @@
-"""Slide 8 eval handoff table (available for manual/automated use)."""
+"""Eval Handoff from onsite — Non STLA rows where Onsite Evaluator is Yes."""
 
 from __future__ import annotations
 
 import pandas as pd
 
-from wsr.report_data.planning import planning_dcr_column
-from wsr.tracker import format_date, latest_comment, parse_dcr_id
+from wsr.rich_text import TextRun, resolve_display
+from wsr.tracker import parse_dcr_id
+
+COL_ONSITE = "Onsite Evaluator"
+COL_DCR = "DCR ID - PTC"
+COL_SUMMARY = "Summary"
+COL_OWNER = "DCR Owner"
+COL_HANDOFF_DATE = "Eval Handoff Date"
+COL_REMARK = "Eval Handoff Remark"
 
 
-def _report_month_year(report_date: str) -> tuple[int, int]:
-    parsed = pd.to_datetime(report_date, dayfirst=True)
-    return parsed.month, parsed.year
+def _cell(value) -> str:
+    text = resolve_display(value)
+    return text if isinstance(text, str) else ""
 
 
-def _first_evaluator_name(value) -> str:
-    if pd.isna(value) or str(value).strip() in ("", "nan"):
-        return "-"
-    text = str(value).strip()
-    return text.split("/")[0].split(",")[0].strip()
+def _is_yes(value) -> bool:
+    return _cell(value).lower() in {"yes", "y"}
 
 
-def _planning_handoff_date(row: pd.Series) -> tuple[pd.Timestamp | None, str]:
-    for column in (
-        "L2/DRB Eval Send dates\nDD-MM-YY",
-        "Eval completion date, (if it is evaluation)\nDD-MM-YY",
-    ):
-        if column not in row.index:
-            continue
-        parsed = pd.to_datetime(row.get(column), errors="coerce")
-        if pd.notna(parsed):
-            return parsed, format_date(parsed)
-    return None, "-"
+def _excel_row(idx) -> int:
+    if isinstance(idx, (int, float)) and idx == idx:
+        return int(idx) + 2
+    return -1
 
 
 def eval_handoff_items(
-    planning: pd.DataFrame,
-    tracker_lookup_map: dict[int, pd.Series],
-    report_date: str,
-    limit: int = 10,
+    tracker: pd.DataFrame,
+    rich_runs: dict[tuple[int, str], list[TextRun]] | None = None,
 ) -> list[dict]:
-    month, year = _report_month_year(report_date)
-    dcr_col = planning_dcr_column(planning)
-    if dcr_col is None:
+    """
+    Rows for the Eval Handoff slide.
+
+    Include every Non STLA row where ``Onsite Evaluator`` is Yes.
+    Struck-through + replacement values (e.g. handoff dates) are both kept.
+    """
+    if tracker is None or tracker.empty or COL_ONSITE not in tracker.columns:
         return []
 
-    items = []
-    for _, row in planning.iterrows():
-        dcr_id = parse_dcr_id(row.get(dcr_col))
-        if dcr_id is None:
+    items: list[dict] = []
+    seen: set[int] = set()
+    for idx, row in tracker.iterrows():
+        if not _is_yes(row.get(COL_ONSITE)):
             continue
 
-        handoff_ts, handoff_date = _planning_handoff_date(row)
-        if handoff_ts is None or handoff_ts.month != month or handoff_ts.year != year:
-            continue
+        dcr_id = parse_dcr_id(row.get(COL_DCR)) if COL_DCR in tracker.columns else None
+        if dcr_id is not None:
+            if dcr_id in seen:
+                continue
+            seen.add(dcr_id)
+            dcr_text = str(dcr_id)
+        else:
+            dcr_text = _cell(row.get(COL_DCR)) or "-"
 
-        tracker_row = tracker_lookup_map.get(dcr_id)
-        summary = str(row.get("Summary", "-")) if pd.notna(row.get("Summary")) else "-"
-        if tracker_row is not None and pd.notna(tracker_row.get("Summary")):
-            summary = str(tracker_row.get("Summary"))
-
-        evaluator = _first_evaluator_name(row.get("KPIT User"))
-        if evaluator == "-":
-            evaluator = _first_evaluator_name(row.get("Estimator"))
-
-        remark = "-"
-        if pd.notna(row.get("Remarks.1")) and str(row.get("Remarks.1")).strip() not in ("", "nan"):
-            remark = str(row.get("Remarks.1")).strip()
-        elif tracker_row is not None:
-            remark = latest_comment(tracker_row.get("Comments (Daily)"), max_len=None)
+        excel_row = _excel_row(idx)
+        summary = resolve_display(
+            row.get(COL_SUMMARY) if COL_SUMMARY in tracker.columns else None,
+            excel_row=excel_row,
+            column=COL_SUMMARY,
+            rich_runs=rich_runs,
+        )
+        evaluator = resolve_display(
+            row.get(COL_OWNER) if COL_OWNER in tracker.columns else None,
+            excel_row=excel_row,
+            column=COL_OWNER,
+            rich_runs=rich_runs,
+        )
+        handoff_date = resolve_display(
+            row.get(COL_HANDOFF_DATE) if COL_HANDOFF_DATE in tracker.columns else None,
+            excel_row=excel_row,
+            column=COL_HANDOFF_DATE,
+            rich_runs=rich_runs,
+            as_date=True,
+        )
+        remark = resolve_display(
+            row.get(COL_REMARK) if COL_REMARK in tracker.columns else None,
+            excel_row=excel_row,
+            column=COL_REMARK,
+            rich_runs=rich_runs,
+        )
 
         items.append(
             {
-                "dcr_id": dcr_id,
-                "evaluator": evaluator,
-                "handoff_date": handoff_date,
-                "remark": remark,
-                "summary": summary,
+                "dcr_id": dcr_text,
+                "summary": summary or "-",
+                "evaluator": evaluator or "-",
+                "handoff_date": handoff_date if handoff_date not in ("", None) else "-",
+                "remark": remark or "-",
             }
         )
-        if len(items) >= limit:
-            break
     return items

@@ -267,11 +267,22 @@ def save_planning_chart(
     planning: dict[str, int],
     output_path: str | Path,
 ) -> Path:
-    categories = ["Q3 Actual Available", f"{planning['planned_pct']}% of Q3 is Planned"]
-    values = [planning["available_hours"], planning["planned_hours"]]
+    estimated = planning.get("estimated_hours", planning["planned_hours"])
+    available = planning["available_hours"]
+    burndown = planning.get("burndown_hours", 0)
+    planned_pct = planning.get("planned_pct")
+    if planned_pct is None:
+        planned_pct = int(round((estimated / available) * 100)) if available else 0
+
+    categories = [
+        "Q3 Actual Available",
+        f"{planned_pct}% of Q3 Planned",
+        "Burndown",
+    ]
+    values = [available, estimated, burndown]
 
     fig, ax = plt.subplots(figsize=(11.2, 4.6))
-    bars = ax.bar(categories, values, color="#92D050", width=0.45)
+    bars = ax.bar(categories, values, color="#92D050", width=0.55)
     ax.set_title(
         "PFS Quarterly Planning 2026",
         fontdict={"fontsize": 14, "fontweight": "normal"},

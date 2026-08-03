@@ -61,11 +61,19 @@ def add_table(slide, headers, rows, top=None, col_widths=None) -> float:
     for col_idx, header in enumerate(headers):
         table.cell(0, col_idx).text = header
 
+    from wsr.rich_text import apply_cell_strikes, write_table_cell
+
+    strike_map: list[tuple[int, int, list]] = []
     for row_idx, row in enumerate(rows, start=1):
         for col_idx, value in enumerate(row):
-            table.cell(row_idx, col_idx).text = str(value)
+            cell = table.cell(row_idx, col_idx)
+            lines = write_table_cell(cell, value)
+            strike_map.append((row_idx, col_idx, lines))
 
     style_table_cells(table)
+    for row_idx, col_idx, lines in strike_map:
+        if any(strike for _, strike in lines):
+            apply_cell_strikes(table.cell(row_idx, col_idx), lines)
     return top
 
 
