@@ -28,6 +28,8 @@ class ScrumWorkbook:
     tracker: pd.DataFrame
     visibility: pd.DataFrame
     ddp: pd.DataFrame
+    risks: pd.DataFrame
+    action_items: pd.DataFrame
     tracker_map: dict[int, pd.Series]
     tracker_rows: dict[int, list[pd.Series]]
 

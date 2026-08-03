@@ -7,9 +7,11 @@ from pathlib import Path
 import pandas as pd
 
 from wsr.constants import (
+    ACTION_ITEM_SHEET,
     DDP_SHEET,
     DEFAULT_PLANNING_BOOK,
     GRAPH_SHEET,
+    RISK_SHEET,
     TRACKER_SHEET,
     VISIBILITY_SHEET,
 )
@@ -36,6 +38,8 @@ REQUIRED_SCRUM_SHEETS = (
     TRACKER_SHEET,
     VISIBILITY_SHEET,
     DDP_SHEET,
+    RISK_SHEET,
+    ACTION_ITEM_SHEET,
 )
 
 TRACKER_REQUIRED_COLUMNS = (

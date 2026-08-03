@@ -18,18 +18,22 @@ from wsr.constants.layout import (
     LAYOUT_CONTENT,
     LAYOUT_OPENING,
     PENDING_TABLE_ROW_CAP,
+    PENDING_ROWS_PER_SLIDE,
 )
 from wsr.constants.sheets import (
+    ACTION_ITEM_SHEET,
     DDP_SHEET,
     DEFAULT_DATA_FILE,
     DEFAULT_PLANNING_BOOK,
     GRAPH_SHEET,
     PLANNING_SHEET,
+    RISK_SHEET,
     TRACKER_SHEET,
     VISIBILITY_SHEET,
 )
 
 __all__ = [
+    "ACTION_ITEM_SHEET",
     "AGENDA_BADGE_SIZE",
     "AGENDA_ITEMS",
     "AGENDA_LAYOUT",
@@ -51,7 +55,9 @@ __all__ = [
     "LAYOUT_CONTENT",
     "LAYOUT_OPENING",
     "PENDING_TABLE_ROW_CAP",
+    "PENDING_ROWS_PER_SLIDE",
     "PLANNING_SHEET",
+    "RISK_SHEET",
     "TRACKER_SHEET",
     "VISIBILITY_SHEET",
 ]

@@ -7,9 +7,11 @@ from pathlib import Path
 import pandas as pd
 
 from wsr.constants import (
+    ACTION_ITEM_SHEET,
     DDP_SHEET,
     DEFAULT_DATA_FILE,
     PLANNING_SHEET,
+    RISK_SHEET,
     TRACKER_SHEET,
     VISIBILITY_SHEET,
 )
@@ -49,3 +51,11 @@ def load_ddp_plan(data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
 
 def load_non_stla_planning(data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
     return _read_sheet(data_file, PLANNING_SHEET, header=1)
+
+
+def load_risks(data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
+    return _read_sheet(data_file, RISK_SHEET)
+
+
+def load_action_items(data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
+    return _read_sheet(data_file, ACTION_ITEM_SHEET)

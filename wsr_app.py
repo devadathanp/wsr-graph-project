@@ -79,9 +79,9 @@ class WsrApp(tk.Tk):
         hint = ttk.Label(
             self,
             text=(
-                "Report date is used on slides and as the Planned Completion cutoff "
-                "for pending tables (slides 5–6). Planned % drives the slide 11 bar "
-                "(planned hours = this % of available hours from the Planning workbook)."
+                "Report date defaults to today (the day you generate). It appears on "
+                "slides and is the Planned Completion cutoff for pending tables "
+                "(slides 5–6). Planned % drives the slide 11 bar."
             ),
             foreground="#666",
             wraplength=460,
@@ -137,14 +137,7 @@ class WsrApp(tk.Tk):
                 if candidate.exists():
                     self.planning_var.set(str(candidate))
                     break
-        try:
-            from wsr.graph import latest_reported_week
-
-            _, detected_date = latest_reported_week(str(scrum))
-            if detected_date:
-                self.date_var.set(detected_date)
-        except Exception:
-            pass
+        # Keep today's date (set at app start) unless the user already edited it.
         self.status_var.set("Ready. Confirm the report date, then click 'Generate WSR'.")
 
     @staticmethod

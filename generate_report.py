@@ -30,7 +30,7 @@ def main():
         default=None,
         help="Report date dd-mm-yyyy (shown on slides; also used as the Planned "
         "Completion cutoff for evaluation/implementation pending on slides 5–6). "
-        "Auto-detected from the graph sheet if omitted.",
+        "Defaults to today's date if omitted.",
     )
     parser.add_argument("--assets-dir", default="report_assets", help="Directory for chart images")
     parser.add_argument(

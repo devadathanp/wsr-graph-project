@@ -1,81 +1,96 @@
-"""Slide 7 DDP MS4-5 table rows."""
+"""Slide 7 DDP MS4-5 rows from Non STLA tracker columns."""
 
 from __future__ import annotations
 
 import pandas as pd
 
-from wsr.tracker import format_date, latest_comment, parse_dcr_id
+from wsr.tracker import format_date, parse_dcr_id
+
+COL_DCR = "DCR ID - PTC"
+COL_SUMMARY = "Summary"
+COL_DDP_NEEDED = "Is DDP Testing Needed"
+COL_PLAN_DATE = "DDP Plan Date"
+COL_APPEARED_DATE = "DDP Appeared Date"
+COL_PROGRAM = "DDP- Program"
+COL_DEPENDENCIES = "DDP Dependencies"
+COL_REMARK = "DDP Remark"
+COL_STATUS = "DDP Status"
 
 
-def ddp_row_item(
-    ddp_row: pd.Series,
-    tracker_lookup_map: dict[int, pd.Series],
-    sr_no: int,
-) -> dict:
-    dcr_no = ddp_row.get("DCR No")
-    dcr_text = "-" if pd.isna(dcr_no) else str(dcr_no).replace(".0", "").strip()
-    dcr_id = parse_dcr_id(dcr_no)
-    tracker_row = tracker_lookup_map.get(dcr_id) if dcr_id is not None else None
+def _cell(value) -> str:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return ""
+    if pd.isna(value):
+        return ""
+    if isinstance(value, float) and value == int(value):
+        return str(int(value))
+    text = str(value).strip()
+    if text.lower() in ("nan", "none", "nat"):
+        return ""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
 
-    if pd.notna(ddp_row.get("Diagnostics Name")):
-        summary = str(ddp_row.get("Diagnostics Name"))
-    elif tracker_row is not None:
-        summary = str(tracker_row.get("Summary", "-"))
-    else:
-        summary = "-"
 
-    remarks = ddp_row.get("Current status", ddp_row.get("Status", "-"))
-    if pd.isna(remarks) or str(remarks).strip() in ("", "nan"):
-        remarks = (
-            latest_comment(tracker_row.get("Comments (Daily)"), max_len=200)
-            if tracker_row is not None
-            else "-"
+def _format_ddp_date(value) -> str:
+    """Format plan/appeared dates; keep multi-line Excel text as slash-separated."""
+    text = _cell(value)
+    if not text:
+        return "-"
+    if "\n" in text:
+        parts = [part.strip() for part in text.split("\n") if part.strip()]
+        return " / ".join(parts) if parts else "-"
+    formatted = format_date(value)
+    return formatted if formatted else "-"
+
+
+def _ddp_needed(value) -> bool:
+    return _cell(value).lower() in {"yes", "y"}
+
+
+def _status_active(value) -> bool:
+    status = _cell(value).lower()
+    # Empty status still shown if DDP testing is needed; only Closed is dropped.
+    return status != "closed"
+
+
+def ddp_ms45_items(tracker: pd.DataFrame) -> list[dict[str, str]]:
+    """
+    Active DDP MS4-5 rows for slide 7.
+
+    Include rows where ``Is DDP Testing Needed`` is Yes and ``DDP Status``
+    is not Closed.
+    """
+    if tracker is None or tracker.empty:
+        return []
+    if COL_DDP_NEEDED not in tracker.columns:
+        return []
+
+    items: list[dict[str, str]] = []
+    seen: set[int] = set()
+    for _, row in tracker.iterrows():
+        if not _ddp_needed(row.get(COL_DDP_NEEDED)):
+            continue
+        if COL_STATUS in tracker.columns and not _status_active(row.get(COL_STATUS)):
+            continue
+
+        dcr_id = parse_dcr_id(row.get(COL_DCR))
+        if dcr_id is not None:
+            if dcr_id in seen:
+                continue
+            seen.add(dcr_id)
+            dcr_text = str(dcr_id)
+        else:
+            dcr_text = _cell(row.get(COL_DCR)) or "-"
+
+        items.append(
+            {
+                "dcr_id": dcr_text,
+                "summary": _cell(row.get(COL_SUMMARY)) or "-",
+                "plan_date": _format_ddp_date(row.get(COL_PLAN_DATE)),
+                "appeared_date": _format_ddp_date(row.get(COL_APPEARED_DATE)),
+                "program": _cell(row.get(COL_PROGRAM)) or "-",
+                "dependencies": _cell(row.get(COL_DEPENDENCIES)) or "-",
+                "remarks": _cell(row.get(COL_REMARK)) or "-",
+                "status": _cell(row.get(COL_STATUS)) or "-",
+            }
         )
-
-    dependencies = "-"
-    if tracker_row is not None:
-        for field in (
-            "Support Required from team",
-            "Reasons for delay",
-            "Mitigation Plan",
-        ):
-            value = tracker_row.get(field)
-            if pd.notna(value) and str(value).strip() not in ("", "nan", "0"):
-                dependencies = str(value).strip().replace("\n", " ")
-                break
-
-    return {
-        "sr_no": sr_no,
-        "dcr_id": dcr_text,
-        "summary": summary,
-        "plan_date": format_date(ddp_row.get("Revised planned dates", ddp_row.get("Appeared Plan date"))),
-        "appeared_date": format_date(ddp_row.get("Appeared Plan date")),
-        "program": str(ddp_row.get("Bench Type", "-")) if pd.notna(ddp_row.get("Bench Type")) else "-",
-        "dependencies": dependencies,
-        "remarks": str(remarks),
-    }
-
-
-def ddp_ms45_items(
-    ddp: pd.DataFrame,
-    tracker_lookup_map: dict[int, pd.Series],
-    limit: int = 7,
-) -> list[dict]:
-    rows = ddp[ddp["DCR No"].notna()].copy()
-    rows = rows[~rows["DCR No"].astype(str).str.strip().str.upper().eq("TBD")]
-    rows["_ms45"] = rows["Status"].astype(str).str.contains(r"MS\s*4|4-5|4_5", case=False, na=False)
-    rows["_has_diag"] = rows["Diagnostics Name"].notna()
-    rows = rows.sort_values(by=["_ms45", "_has_diag"], ascending=[False, False])
-
-    items = []
-    for _, row in rows.iterrows():
-        items.append(ddp_row_item(row, tracker_lookup_map, len(items) + 1))
-        if len(items) >= limit:
-            return items
-
-    rows = ddp[ddp["Diagnostics Name"].notna()].copy()
-    for _, row in rows.iterrows():
-        items.append(ddp_row_item(row, tracker_lookup_map, len(items) + 1))
-        if len(items) >= limit:
-            break
     return items

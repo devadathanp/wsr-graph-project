@@ -10,5 +10,7 @@ TRACKER_SHEET = "Non STLA"
 VISIBILITY_SHEET = "Visibility Sheet."
 DDP_SHEET = "DDP_Plan"
 PLANNING_SHEET = "Non_STLA (Planning)"
+RISK_SHEET = "Risk and Mitigation Plan"
+ACTION_ITEM_SHEET = "ActionItem"
 
 DEFAULT_PLANNING_BOOK = Path(__file__).resolve().parent.parent.parent / "Book2.xlsx"

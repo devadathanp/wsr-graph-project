@@ -19,8 +19,8 @@ def resolve_report_timing(
     report_date: str | None,
     log: RunLog,
 ) -> ReportTiming:
-    detected_week, detected_date = latest_reported_week(str(scrum_path))
-    log.info(f"Detected week={detected_week!r}, date={detected_date!r}")
+    detected_week, _ = latest_reported_week(str(scrum_path))
+    log.info(f"Detected week={detected_week!r}")
 
     if chart_week is None:
         if detected_week is None:
@@ -30,8 +30,10 @@ def resolve_report_timing(
             )
         chart_week = detected_week
 
+    # Slide dates (title, footers, etc.) use the day the report is generated,
+    # not the graph-sheet week date. Chart week stays auto-detected separately.
     if report_date is None:
-        report_date = detected_date or datetime.now().strftime("%d-%m-%Y")
+        report_date = datetime.now().strftime("%d-%m-%Y")
 
     pending_week = pending_week_for_chart(chart_week)
     log.info(f"Using chart week={chart_week}, report date={report_date}")

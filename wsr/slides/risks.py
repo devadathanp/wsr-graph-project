@@ -1,4 +1,4 @@
-"""Slide 10 — Risks, issues, and impact legend."""
+"""Slide 10 — Risks & Mitigation Plan (from Risk and Mitigation Plan sheet)."""
 
 from __future__ import annotations
 
@@ -52,15 +52,33 @@ def _add_impact_legend(slide) -> None:
         style_body_run(run)
 
 
-def add_risks_slide(prs: Presentation, report_date: str) -> None:
-    slide = new_content_slide(prs, "Risks & Mitigation Plan", report_date, 10)
-    headers = ["#", "Risk", "Impact", "Risk Mitigation / Contingency"]
-    rows = [empty_row(len(headers))]
-    risks_top = add_table(slide, headers, rows, col_widths=[0.45, 4.4, 1.15, 4.6])
+def add_risks_slide(
+    prs: Presentation,
+    report_date: str,
+    items: list[dict] | None = None,
+    *,
+    slide_number: int = 9,
+) -> None:
+    slide = new_content_slide(prs, "Risks & Mitigation Plan", report_date, slide_number)
+    headers = ["#", "DCR", "Risk / Issue", "Impact", "Support Required", "Status"]
+    rows = [
+        [
+            str(i + 1),
+            item.get("dcr", ""),
+            item.get("risk", ""),
+            item.get("impact", ""),
+            item.get("support", ""),
+            item.get("status", ""),
+        ]
+        for i, item in enumerate(items or [])
+    ]
+    if not rows:
+        rows = [empty_row(len(headers))]
 
-    issue_headers = ["#", "Issues", "Impact", "Contingency action"]
-    issue_rows = [empty_row(len(issue_headers))]
-    issue_top = risks_top + min(0.34 * (len(rows) + 1), 5.8) + 0.35
-    add_table(slide, issue_headers, issue_rows, top=issue_top, col_widths=[0.45, 4.4, 1.15, 4.6])
-
+    add_table(
+        slide,
+        headers,
+        rows,
+        col_widths=[0.45, 1.0, 4.2, 1.6, 2.5, 1.25],
+    )
     _add_impact_legend(slide)

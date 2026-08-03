@@ -81,22 +81,40 @@ def add_agenda_slide(prs: Presentation, report_date: str) -> None:
         style_agenda_run(run)
 
 
-def add_mom_slide(prs: Presentation, report_date: str) -> None:
-    slide = new_content_slide(prs, "MOM of 11/06,18/06", report_date, 3)
+def add_mom_slide(
+    prs: Presentation,
+    report_date: str,
+    items: list[dict] | None = None,
+) -> None:
+    slide = new_content_slide(prs, "Action Items", report_date, 3)
     headers = [
         "Sr. No.",
-        "Discussion points",
         "Action Items",
+        "Priority",
         "Status",
-        "Ownership",
-        "Action item identified",
-        "Action closure date",
+        "Owner",
+        "Identified Date",
+        "Target Closure Date",
         "Remarks",
     ]
-    rows = [empty_row(len(headers))]
+    rows = [
+        [
+            str(i + 1),
+            item.get("action", ""),
+            item.get("priority", ""),
+            item.get("status", ""),
+            item.get("owner", ""),
+            item.get("identified_date", ""),
+            item.get("target_date", ""),
+            item.get("remarks", ""),
+        ]
+        for i, item in enumerate(items or [])
+    ]
+    if not rows:
+        rows = [empty_row(len(headers))]
     add_table(
         slide,
         headers,
         rows,
-        col_widths=[0.55, 2.2, 1.45, 0.9, 0.95, 1.45, 1.35, 2.45],
+        col_widths=[0.55, 2.6, 0.85, 1.05, 1.15, 1.25, 1.35, 3.0],
     )

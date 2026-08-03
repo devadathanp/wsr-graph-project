@@ -83,6 +83,7 @@ def add_closing_slide(
     *,
     assets_dir: Path,
     backdrop_path: Path | None = None,
+    slide_number: int = 11,
 ) -> None:
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_OPENING])
 
@@ -133,4 +134,4 @@ def add_closing_slide(
         name=FONT_BODY,
     )
 
-    _set_closing_footer(slide, report_date, 12)
+    _set_closing_footer(slide, report_date, slide_number)

@@ -17,8 +17,9 @@ def add_planning_slide(
     qp: dict[str, int] | None,
     *,
     chart_image: Path | None = None,
+    slide_number: int = 10,
 ) -> None:
-    slide = new_content_slide(prs, "Quarterly Planning 2026-Non STLA", report_date, 11)
+    slide = new_content_slide(prs, "Quarterly Planning 2026-Non STLA", report_date, slide_number)
 
     if qp is None:
         note = slide.shapes.add_textbox(Inches(0.59), Inches(2.5), Inches(12.18), Inches(0.8))

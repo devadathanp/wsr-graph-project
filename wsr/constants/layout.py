@@ -20,9 +20,8 @@ DCR_STATUS_NOTE_LINES = [
 ]
 
 AGENDA_ITEMS = [
-    "MOM & Action Items",
+    "Action Items",
     "DCR Status",
-    "Discussion Points",
     "Issues and Risks",
 ]
 AGENDA_BADGE_SIZE = 1.04
@@ -30,7 +29,8 @@ AGENDA_LAYOUT = [
     {"badge_top": 1.22, "text_left": 1.72, "text_top": 1.55},
     {"badge_top": 2.26, "text_left": 1.66, "text_top": 2.65},
     {"badge_top": 3.29, "text_left": 1.66, "text_top": 3.57},
-    {"badge_top": 4.27, "text_left": 1.72, "text_top": 4.59},
 ]
 
 PENDING_TABLE_ROW_CAP = 12
+# Max data rows per pending slide so the table fits the content area without overflow.
+PENDING_ROWS_PER_SLIDE = 10
