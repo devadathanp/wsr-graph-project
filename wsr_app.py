@@ -49,37 +49,19 @@ class WsrApp(tk.Tk):
 
     def _build_ui(self) -> None:
         header = ttk.Label(self, text="Weekly Status Report Generator", font=("Segoe UI", 15, "bold"))
-        header.grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 2))
-        sub = ttk.Label(
-            self,
-            text="Generate the WSR PowerPoint from your Scrum and Planning Excel files.",
-            foreground="#555",
-        )
-        sub.grid(row=1, column=0, columnspan=3, sticky="w", pady=(0, 12))
+        header.grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 12))
 
-        self._file_row(2, "Scrum workbook *", self.scrum_var, self._pick_scrum)
-        self._file_row(3, "Planning workbook", self.planning_var, self._pick_planning)
-
-        hint = ttk.Label(
-            self,
-            text=(
-                "Report date and output filename are set automatically from this "
-                "device’s date and time (e.g. WSR_Report_20260825_200000.pptx). "
-                "The report is saved next to the Scrum workbook."
-            ),
-            foreground="#666",
-            wraplength=460,
-        )
-        hint.grid(row=4, column=0, columnspan=3, sticky="w", pady=(0, 8))
+        self._file_row(1, "Scrum workbook *", self.scrum_var, self._pick_scrum)
+        self._file_row(2, "Planning workbook", self.planning_var, self._pick_planning)
 
         self.progress = ttk.Progressbar(self, mode="indeterminate", length=420)
-        self.progress.grid(row=5, column=0, columnspan=3, sticky="we", pady=(6, 4))
+        self.progress.grid(row=3, column=0, columnspan=3, sticky="we", pady=(10, 4))
 
         self.status = ttk.Label(self, textvariable=self.status_var, foreground="#333", wraplength=460)
-        self.status.grid(row=6, column=0, columnspan=3, sticky="w")
+        self.status.grid(row=4, column=0, columnspan=3, sticky="w")
 
         self.generate_btn = ttk.Button(self, text="Generate WSR", command=self._on_generate)
-        self.generate_btn.grid(row=7, column=0, columnspan=3, sticky="e", pady=(14, 0))
+        self.generate_btn.grid(row=5, column=0, columnspan=3, sticky="e", pady=(14, 0))
 
         self.columnconfigure(1, weight=1)
 
