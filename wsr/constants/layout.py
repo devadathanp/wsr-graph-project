@@ -11,13 +11,7 @@ DCR_IMPL_TOP = 4.12
 DCR_PANEL_LEFT = 11.18
 DCR_PANEL_WIDTH = 2.00
 DCR_SUMMARY_TOP = 0.70
-DCR_NOTES_GAP = 0.65
 DCR_TITLE_TOP = 0.26
-DCR_STATUS_NOTE_LINES = [
-    "The initial plan is based on high level estimations and DCRs in KPIT Pune team's bucket as on date.",
-    "Revised baseline plan is updated based on reshuffling done during execution in the quarter "
-    "based on DCR Rejections / moved to next quarter/ dependencies.",
-]
 
 AGENDA_ITEMS = [
     "Action Items",

@@ -71,9 +71,9 @@ class WsrApp(tk.Tk):
         hint = ttk.Label(
             self,
             text=(
-                "Report date defaults to today (the day you generate). It appears on "
-                "slides and is the Planned Completion cutoff for pending tables "
-                "(slides 5–6)."
+                "Select the latest Scrum workbook (e.g. SCRUM_PFS_August …). "
+                "Report date defaults to today and is the Planned Completion cutoff "
+                "for pending tables (slides 5–6)."
             ),
             foreground="#666",
             wraplength=460,

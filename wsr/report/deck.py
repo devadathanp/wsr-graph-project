@@ -82,7 +82,11 @@ def build_presentation(
         f"Active action items (external; not closed/cancelled/rejected): {len(action_item_rows)}"
     )
 
-    summary_rows = summary_table_rows(str(workbook.path))
+    summary_rows = summary_table_rows(str(workbook.path), tracker=workbook.tracker)
+    log.info(
+        "Slide 4 Rejected/Deferred from Non STLA "
+        f"(Rejected={summary_rows[-2][1]}; Deferred={summary_rows[-1][1]})"
+    )
 
     log.info("Assembling PowerPoint…")
     prs = Presentation(str(template_path))

@@ -5,9 +5,10 @@ Bar 1 — Q3 Actual Available hours from Book2.xlsx
   (row labelled "Total work Hrs. Available for PFS team").
 
 Bar 2 — Sum of Scrum Non STLA effort hours:
-  - Prefer ``Revised Estimation`` when that cell has a value.
+  - Prefer ``Total Revised Estimation`` (or legacy ``Revised Estimation``)
+    when that cell has a value.
   - Otherwise use ``Estimated Hrs``.
-  - If the Revised Estimation column is missing entirely, sum Estimated Hrs only.
+  - If no revised column exists, sum Estimated Hrs only.
 
 Bar 3 — Burndown:
   sum(Actual Efforts (Hrs)) − sum(Competency Gap Efforts).
@@ -29,7 +30,12 @@ PLANNED_BANDWIDTH_PCT = DEFAULT_PLANNED_BANDWIDTH_PCT
 _AVAILABLE_LABEL = "total work hrs available for pfs team"
 
 COL_ESTIMATED_HRS = "Estimated Hrs"
-COL_REVISED_ESTIMATION = "Revised Estimation"
+# Preferred / legacy names — actual header is resolved at runtime.
+COL_REVISED_ESTIMATION = "Total Revised Estimation"
+_REVISED_ESTIMATION_ALIASES = (
+    "total revised estimation",
+    "revised estimation",
+)
 COL_ACTUAL_EFFORTS = "Actual Efforts (Hrs)"
 COL_COMPETENCY_GAP = "Competency Gap Efforts"
 
@@ -43,6 +49,22 @@ def _as_float(value) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _normalize_header(value) -> str:
+    return " ".join(str(value).strip().lower().replace(".", " ").split())
+
+
+def revised_estimation_column(columns) -> str | None:
+    """Resolve Total Revised Estimation / Revised Estimation despite header typos."""
+    normalized = {_normalize_header(col): col for col in columns}
+    for alias in _REVISED_ESTIMATION_ALIASES:
+        if alias in normalized:
+            return normalized[alias]
+    for key, original in normalized.items():
+        if "revised" in key and "estimation" in key:
+            return original
+    return None
 
 
 def _normalize_label(value) -> str:
@@ -81,16 +103,18 @@ def _lookup_available_hours(ws) -> tuple[float | None, int | None]:
     return best["hours"], best["members"]
 
 
-def row_estimated_hours(row: pd.Series) -> float | None:
+def row_estimated_hours(row: pd.Series, revised_col: str | None = None) -> float | None:
     """
     Hours for one tracker row.
 
-    Revised Estimation wins when present; otherwise Estimated Hrs.
+    Total Revised Estimation wins when present; otherwise Estimated Hrs.
     """
     estimated = _as_float(row.get(COL_ESTIMATED_HRS)) if COL_ESTIMATED_HRS in row.index else None
-    if COL_REVISED_ESTIMATION not in row.index:
+    if revised_col is None:
+        revised_col = revised_estimation_column(row.index)
+    if not revised_col or revised_col not in row.index:
         return estimated
-    revised = _as_float(row.get(COL_REVISED_ESTIMATION))
+    revised = _as_float(row.get(revised_col))
     if revised is not None:
         return revised
     return estimated
@@ -100,13 +124,14 @@ def sum_scrum_estimated_hours(tracker: pd.DataFrame | None) -> int | None:
     """Sum per-row estimated hours (revised when present) across the Scrum tracker."""
     if tracker is None or tracker.empty:
         return None
-    if COL_ESTIMATED_HRS not in tracker.columns and COL_REVISED_ESTIMATION not in tracker.columns:
+    revised_col = revised_estimation_column(tracker.columns)
+    if COL_ESTIMATED_HRS not in tracker.columns and revised_col is None:
         return None
 
     total = 0.0
     saw_any = False
     for _, row in tracker.iterrows():
-        hours = row_estimated_hours(row)
+        hours = row_estimated_hours(row, revised_col=revised_col)
         if hours is None:
             continue
         total += hours
