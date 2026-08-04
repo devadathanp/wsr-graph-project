@@ -43,8 +43,6 @@ class WsrApp(tk.Tk):
 
         self.scrum_var = tk.StringVar()
         self.planning_var = tk.StringVar()
-        self.output_var = tk.StringVar()
-        self.date_var = tk.StringVar(value=datetime.now().strftime("%d-%m-%Y"))
         self.status_var = tk.StringVar(value="Select your Scrum workbook to begin.")
 
         self._build_ui()
@@ -61,37 +59,31 @@ class WsrApp(tk.Tk):
 
         self._file_row(2, "Scrum workbook *", self.scrum_var, self._pick_scrum)
         self._file_row(3, "Planning workbook", self.planning_var, self._pick_planning)
-        self._file_row(4, "Save report as", self.output_var, self._pick_output, save=True)
-
-        ttk.Label(self, text="Report date *").grid(row=5, column=0, sticky="w", pady=4)
-        date_entry = ttk.Entry(self, textvariable=self.date_var, width=48)
-        date_entry.grid(row=5, column=1, sticky="we", padx=8, pady=4)
-        ttk.Label(self, text="dd-mm-yyyy").grid(row=5, column=2, sticky="w", pady=4)
 
         hint = ttk.Label(
             self,
             text=(
-                "Select the latest Scrum workbook (e.g. SCRUM_PFS_August …). "
-                "Report date defaults to today and is the Planned Completion cutoff "
-                "for pending tables (slides 5–6)."
+                "Report date and output filename are set automatically from this "
+                "device’s date and time (e.g. WSR_Report_20260825_200000.pptx). "
+                "The report is saved next to the Scrum workbook."
             ),
             foreground="#666",
             wraplength=460,
         )
-        hint.grid(row=6, column=0, columnspan=3, sticky="w", pady=(0, 8))
+        hint.grid(row=4, column=0, columnspan=3, sticky="w", pady=(0, 8))
 
         self.progress = ttk.Progressbar(self, mode="indeterminate", length=420)
-        self.progress.grid(row=7, column=0, columnspan=3, sticky="we", pady=(6, 4))
+        self.progress.grid(row=5, column=0, columnspan=3, sticky="we", pady=(6, 4))
 
         self.status = ttk.Label(self, textvariable=self.status_var, foreground="#333", wraplength=460)
-        self.status.grid(row=8, column=0, columnspan=3, sticky="w")
+        self.status.grid(row=6, column=0, columnspan=3, sticky="w")
 
         self.generate_btn = ttk.Button(self, text="Generate WSR", command=self._on_generate)
-        self.generate_btn.grid(row=9, column=0, columnspan=3, sticky="e", pady=(14, 0))
+        self.generate_btn.grid(row=7, column=0, columnspan=3, sticky="e", pady=(14, 0))
 
         self.columnconfigure(1, weight=1)
 
-    def _file_row(self, row: int, label: str, var: tk.StringVar, command, save: bool = False) -> None:
+    def _file_row(self, row: int, label: str, var: tk.StringVar, command) -> None:
         ttk.Label(self, text=label).grid(row=row, column=0, sticky="w", pady=4)
         entry = ttk.Entry(self, textvariable=var, width=48)
         entry.grid(row=row, column=1, sticky="we", padx=8, pady=4)
@@ -109,55 +101,35 @@ class WsrApp(tk.Tk):
         if path:
             self.planning_var.set(path)
 
-    def _pick_output(self) -> None:
-        path = filedialog.asksaveasfilename(
-            title="Save the WSR report",
-            defaultextension=".pptx",
-            filetypes=[("PowerPoint", "*.pptx")],
-            initialfile=self._default_output_name(),
-        )
-        if path:
-            self.output_var.set(path)
-
     def _autofill_from_scrum(self, scrum: Path) -> None:
-        folder = scrum.parent
-        if not self.output_var.get():
-            self.output_var.set(str(folder / self._default_output_name()))
         if not self.planning_var.get():
             for name in ("Book2.xlsx", "Planning.xlsx", "Planning.xlsm"):
-                candidate = folder / name
+                candidate = scrum.parent / name
                 if candidate.exists():
                     self.planning_var.set(str(candidate))
                     break
-        # Keep today's date (set at app start) unless the user already edited it.
-        self.status_var.set("Ready. Confirm the report date, then click 'Generate WSR'.")
+        self.status_var.set("Ready. Click 'Generate WSR'.")
 
     @staticmethod
-    def _default_output_name() -> str:
-        return f"WSR_Report_{datetime.now():%Y%m%d}.pptx"
+    def _timestamped_output_path(scrum: Path) -> Path:
+        """Save next to the Scrum file using the device date and time."""
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return scrum.parent / f"WSR_Report_{stamp}.pptx"
 
     def _on_generate(self) -> None:
         scrum = self.scrum_var.get().strip()
         if not scrum or not Path(scrum).exists():
             messagebox.showerror(APP_TITLE, "Please select a valid Scrum workbook.")
             return
-        report_date = self.date_var.get().strip()
-        try:
-            datetime.strptime(report_date, "%d-%m-%Y")
-        except ValueError:
-            messagebox.showerror(
-                APP_TITLE,
-                "Report date must be in dd-mm-yyyy format (e.g. 09-07-2026).",
-            )
-            return
 
-        output = self.output_var.get().strip() or str(Path(scrum).parent / self._default_output_name())
-        self.output_var.set(output)
+        now = datetime.now()
+        report_date = now.strftime("%d-%m-%Y")
+        output = str(self._timestamped_output_path(Path(scrum)))
         planning = self.planning_var.get().strip() or None
 
         self.generate_btn.config(state="disabled")
         self.progress.start(12)
-        self.status_var.set("Generating report… this can take up to a minute.")
+        self.status_var.set(f"Generating report… saving as {Path(output).name}")
 
         thread = threading.Thread(
             target=self._run_generation,
@@ -196,11 +168,17 @@ class WsrApp(tk.Tk):
                 self._on_failure,
                 str(exc),
                 detail,
-                Path(exc.log_path) if exc.log_path else log_path,
+                Path(exc.log_path) if getattr(exc, "log_path", None) else log_path,
             )
         except Exception as exc:
             detail = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-            self.after(0, self._on_failure, str(exc), detail, log_path if log_path.exists() else None)
+            self.after(
+                0,
+                self._on_failure,
+                str(exc),
+                detail,
+                log_path if log_path.exists() else None,
+            )
 
     def _on_success(self, result) -> None:
         self.progress.stop()
