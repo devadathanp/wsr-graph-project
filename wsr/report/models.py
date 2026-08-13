@@ -20,6 +20,9 @@ class ReportTiming:
     chart_week: int
     report_date: str
     pending_week: int
+    quarter_long: str
+    quarter_short: str
+    fiscal_year: int
 
 
 @dataclass
@@ -43,4 +46,4 @@ class ChartAssets:
     impl_chart: Path
     eval_chart: Path
     planning_chart: Path | None
-    quarterly_planning: dict[str, int] | None
+    quarterly_planning: dict[str, int | str] | None

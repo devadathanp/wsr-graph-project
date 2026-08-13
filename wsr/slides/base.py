@@ -12,6 +12,7 @@ from wsr_style import (
     TABLE_WIDTH_IN,
     content_top_below_title,
     fit_table_column_widths,
+    remove_subtitle_placeholders,
     set_slide_footer,
     set_slide_title,
     style_key_value_table,
@@ -32,6 +33,7 @@ def new_content_slide(
     title_size=None,
 ):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_CONTENT])
+    remove_subtitle_placeholders(slide)
     if title_size is not None:
         set_slide_title(slide, title, size=title_size)
     else:

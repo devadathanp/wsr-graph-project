@@ -1,5 +1,5 @@
 """
-Data table slides: pending DCRs (5–6+), DDP, handoff.
+Data table slides: pending DCRs (5–6+), DDP, ECM, handoff.
 
 Pending eval/impl tables are split across multiple slides when needed so the
 table never overflows a single page.
@@ -124,15 +124,68 @@ def add_ddp_slide(
     )
 
 
+def add_ecm_slide(
+    prs: Presentation,
+    report_date: str,
+    items: list[dict] | None = None,
+    *,
+    slide_number: int = 8,
+    rows_per_slide: int = PENDING_ROWS_PER_SLIDE,
+) -> int:
+    """ECM testing rows (needed = Yes; active ECM Status only)."""
+    headers = [
+        "Sr.No",
+        "DCR ID",
+        "DCR Summary",
+        "BT Start",
+        "BT End",
+        "Dependencies",
+        "Remarks",
+    ]
+    widths = [0.55, 0.9, 3.4, 1.15, 1.15, 2.4, 2.65]
+    chunks = _chunked(items or [], max(1, rows_per_slide))
+    total_pages = len(chunks)
+    row_offset = 0
+
+    for page_index, chunk in enumerate(chunks):
+        title = "PFS ECM Testing Details"
+        page_title = title if total_pages == 1 else f"{title} ({page_index + 1}/{total_pages})"
+        slide = new_content_slide(prs, page_title, report_date, slide_number + page_index)
+        rows = [
+            [
+                str(row_offset + i + 1),
+                item.get("dcr_id", ""),
+                item.get("summary", ""),
+                item.get("bt_start", ""),
+                item.get("bt_end", ""),
+                item.get("dependencies", ""),
+                item.get("remarks", ""),
+            ]
+            for i, item in enumerate(chunk)
+        ]
+        if not rows:
+            rows = [empty_row(len(headers))]
+        add_table(slide, headers, rows, col_widths=widths)
+        row_offset += len(chunk)
+
+    return total_pages
+
+
 def add_handoff_slide(
     prs: Presentation,
     report_date: str,
     items: list[dict] | None = None,
     *,
     slide_number: int = 8,
+    quarter_label: str = "Q3-2026",
 ) -> None:
     """Eval Handoff from onsite — Onsite Evaluator = Yes."""
-    slide = new_content_slide(prs, "Q3-2026 – Eval Handoff from onsite", report_date, slide_number)
+    slide = new_content_slide(
+        prs,
+        f"{quarter_label} – Eval Handoff from onsite",
+        report_date,
+        slide_number,
+    )
     headers = ["Sr. No.", "DCR ID", "Summary", "Evaluator", "Eval Handoff Date", "Remark"]
     rows = [
         [

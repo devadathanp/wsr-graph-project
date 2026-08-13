@@ -1,4 +1,4 @@
-"""Slide 12 — Closing slide with backdrop image."""
+"""Closing slide — tree backdrop plus two lines of copy. Nothing else."""
 
 from __future__ import annotations
 
@@ -8,24 +8,14 @@ from pptx import Presentation
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches
 
-from wsr.constants import LAYOUT_OPENING
+from wsr.constants import LAYOUT_BLANK
 from wsr_style import (
     CLOSING_HEADLINE_SIZE,
     CLOSING_SUBLINE_SIZE,
     DEFAULT_CLOSING_BACKDROP,
     FONT_BODY,
     FONT_MAJOR,
-    FOOTER_DATE_HEIGHT,
-    FOOTER_DATE_LEFT,
-    FOOTER_DATE_TOP,
-    FOOTER_DATE_WIDTH,
-    FOOTER_NUMBER_HEIGHT,
-    FOOTER_NUMBER_LEFT,
-    FOOTER_NUMBER_TOP,
-    FOOTER_NUMBER_WIDTH,
-    FOOTER_SIZE,
     WHITE,
-    find_placeholder,
     set_run_font,
 )
 
@@ -37,12 +27,6 @@ def _send_shape_to_back(shape) -> None:
     sp_tree.remove(shape._element)
     insert_at = 1 if len(sp_tree) > 0 else 0
     sp_tree.insert(insert_at, shape._element)
-
-
-def _clear_placeholder_text(slide, idx: int) -> None:
-    placeholder = find_placeholder(slide, idx=idx)
-    if placeholder is not None:
-        placeholder.text = ""
 
 
 def resolve_closing_backdrop(assets_dir: Path, override: Path | None = None) -> Path | None:
@@ -61,20 +45,28 @@ def resolve_closing_backdrop(assets_dir: Path, override: Path | None = None) -> 
     return None
 
 
-def _set_closing_footer(slide, report_date: str, slide_number: int) -> None:
-    for left, top, width, height, text in (
-        (FOOTER_DATE_LEFT, FOOTER_DATE_TOP, FOOTER_DATE_WIDTH, FOOTER_DATE_HEIGHT, report_date),
-        (FOOTER_NUMBER_LEFT, FOOTER_NUMBER_TOP, FOOTER_NUMBER_WIDTH, FOOTER_NUMBER_HEIGHT, str(slide_number)),
-    ):
-        box = slide.shapes.add_textbox(Inches(left), Inches(top), Inches(width), Inches(height))
-        text_frame = box.text_frame
-        text_frame.clear()
-        text_frame.margin_left = text_frame.margin_right = text_frame.margin_top = text_frame.margin_bottom = 0
-        paragraph = text_frame.paragraphs[0]
-        paragraph.alignment = PP_ALIGN.RIGHT
-        run = paragraph.add_run()
-        run.text = text
-        set_run_font(run, size=FOOTER_SIZE, color=WHITE, name=FONT_BODY)
+def _add_centered_line(
+    slide,
+    *,
+    text: str,
+    left: float,
+    top: float,
+    width: float,
+    height: float,
+    size,
+    bold: bool,
+    font_name: str,
+) -> None:
+    box = slide.shapes.add_textbox(Inches(left), Inches(top), Inches(width), Inches(height))
+    frame = box.text_frame
+    frame.clear()
+    frame.word_wrap = True
+    frame.vertical_anchor = MSO_ANCHOR.MIDDLE
+    paragraph = frame.paragraphs[0]
+    paragraph.alignment = PP_ALIGN.CENTER
+    run = paragraph.add_run()
+    run.text = text
+    set_run_font(run, size=size, bold=bold, color=WHITE, name=font_name)
 
 
 def add_closing_slide(
@@ -85,7 +77,8 @@ def add_closing_slide(
     backdrop_path: Path | None = None,
     slide_number: int = 11,
 ) -> None:
-    slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_OPENING])
+    del report_date, slide_number
+    slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_BLANK])
 
     backdrop = resolve_closing_backdrop(assets_dir, backdrop_path)
     if backdrop is not None:
@@ -98,40 +91,25 @@ def add_closing_slide(
         )
         _send_shape_to_back(picture)
 
-    for placeholder_idx in (0, 16, 23):
-        _clear_placeholder_text(slide, placeholder_idx)
-
-    headline_box = slide.shapes.add_textbox(Inches(0.7), Inches(4.05), Inches(11.9), Inches(1.5))
-    headline_frame = headline_box.text_frame
-    headline_frame.clear()
-    headline_frame.word_wrap = True
-    headline_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
-    headline_paragraph = headline_frame.paragraphs[0]
-    headline_paragraph.alignment = PP_ALIGN.CENTER
-    headline_run = headline_paragraph.add_run()
-    headline_run.text = "We are imagining mobility with you"
-    set_run_font(
-        headline_run,
+    _add_centered_line(
+        slide,
+        text="We are imagining mobility with you",
+        left=0.7,
+        top=4.05,
+        width=11.9,
+        height=1.5,
         size=CLOSING_HEADLINE_SIZE,
         bold=True,
-        color=WHITE,
-        name=FONT_MAJOR,
+        font_name=FONT_MAJOR,
     )
-
-    subline_box = slide.shapes.add_textbox(Inches(1.2), Inches(5.45), Inches(10.9), Inches(0.55))
-    subline_frame = subline_box.text_frame
-    subline_frame.clear()
-    subline_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
-    subline_paragraph = subline_frame.paragraphs[0]
-    subline_paragraph.alignment = PP_ALIGN.CENTER
-    subline_run = subline_paragraph.add_run()
-    subline_run.text = "Lets collaborate"
-    set_run_font(
-        subline_run,
+    _add_centered_line(
+        slide,
+        text="Let's collaborate",
+        left=1.2,
+        top=5.45,
+        width=10.9,
+        height=0.55,
         size=CLOSING_SUBLINE_SIZE,
         bold=False,
-        color=WHITE,
-        name=FONT_BODY,
+        font_name=FONT_BODY,
     )
-
-    _set_closing_footer(slide, report_date, slide_number)

@@ -14,17 +14,24 @@ from wsr_style import style_body_run
 def add_planning_slide(
     prs: Presentation,
     report_date: str,
-    qp: dict[str, int] | None,
+    qp: dict[str, int | str] | None,
     *,
     chart_image: Path | None = None,
     slide_number: int = 10,
+    quarter_label: str = "Q3-2026",
+    fiscal_year: int = 2026,
 ) -> None:
-    slide = new_content_slide(prs, "Quarterly Planning 2026-Non STLA", report_date, slide_number)
+    slide = new_content_slide(
+        prs,
+        f"Quarterly Planning {fiscal_year}-Non STLA",
+        report_date,
+        slide_number,
+    )
 
     if qp is None:
         note = slide.shapes.add_textbox(Inches(0.59), Inches(2.5), Inches(12.18), Inches(0.8))
         note_run = note.text_frame.paragraphs[0].add_run()
-        note_run.text = "No quarterly planning data found in Book2.xlsx."
+        note_run.text = "No Actual Available Estimate found on the Scrum sheet."
         style_body_run(note_run)
         return
 
@@ -37,15 +44,10 @@ def add_planning_slide(
             height=Inches(4.91),
         )
 
-    bandwidth = slide.shapes.add_textbox(Inches(0.59), Inches(5.85), Inches(10.85), Inches(0.40))
-    bw_run = bandwidth.text_frame.paragraphs[0].add_run()
-    bw_run.text = f"Bandwidth is planned with {qp['resources']} Resources"
-    style_body_run(bw_run, bold=False)
-
-    note = slide.shapes.add_textbox(Inches(0.59), Inches(6.25), Inches(12.18), Inches(0.40))
+    note = slide.shapes.add_textbox(Inches(0.59), Inches(6.05), Inches(12.18), Inches(0.40))
     note_run = note.text_frame.paragraphs[0].add_run()
     note_run.text = (
-        "Note: The Estimations for Q3 Planning are in progress, "
+        f"Note: The Estimations for {quarter_label} Planning are in progress, "
         "these are high level tentative estimations"
     )
     style_body_run(note_run)

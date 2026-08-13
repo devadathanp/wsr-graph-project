@@ -15,6 +15,7 @@ from wsr_style import (
     TITLE_SIZE,
     add_number_badge,
     find_placeholder,
+    remove_subtitle_placeholders,
     set_run_font,
     set_slide_footer,
     style_agenda_run,
@@ -25,6 +26,7 @@ from wsr_style import (
 
 def add_title_slide(prs: Presentation, report_date: str) -> None:
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_OPENING])
+    remove_subtitle_placeholders(slide)
 
     title_ph = find_placeholder(slide, idx=0)
     if title_ph is not None:

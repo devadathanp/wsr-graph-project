@@ -1,14 +1,13 @@
 """
-Quarterly planning metrics for the planning slide.
+Quarterly planning metrics for the planning slide — all from Non STLA.
 
-Bar 1 — Q3 Actual Available hours from Book2.xlsx
-  (row labelled "Total work Hrs. Available for PFS team").
+Bar 1 — Actual Available hours from the ``Actual Available Estimate`` column
+  (number may live in the header, e.g. Actual Available Estimate "7152").
 
-Bar 2 — Sum of Scrum Non STLA effort hours:
+Bar 2 — Sum of Scrum effort hours:
   - Prefer ``Total Revised Estimation`` (or legacy ``Revised Estimation``)
     when that cell has a value.
   - Otherwise use ``Estimated Hrs``.
-  - If no revised column exists, sum Estimated Hrs only.
 
 Bar 3 — Burndown:
   sum(Actual Efforts (Hrs)) − sum(Competency Gap Efforts).
@@ -16,18 +15,16 @@ Bar 3 — Burndown:
 
 from __future__ import annotations
 
-from pathlib import Path
+import re
 
 import pandas as pd
-from openpyxl import load_workbook
-
-from wsr.constants import DEFAULT_PLANNING_BOOK
 
 # Kept for CLI/API compatibility; no longer drives the second planning bar.
 DEFAULT_PLANNED_BANDWIDTH_PCT = 90
 PLANNED_BANDWIDTH_PCT = DEFAULT_PLANNED_BANDWIDTH_PCT
 
-_AVAILABLE_LABEL = "total work hrs available for pfs team"
+_AVAILABLE_HEADER_TOKEN = "actual available estimate"
+_AVAILABLE_NUMBER = re.compile(r"(\d+(?:\.\d+)?)")
 
 COL_ESTIMATED_HRS = "Estimated Hrs"
 # Preferred / legacy names — actual header is resolved at runtime.
@@ -38,6 +35,7 @@ _REVISED_ESTIMATION_ALIASES = (
 )
 COL_ACTUAL_EFFORTS = "Actual Efforts (Hrs)"
 COL_COMPETENCY_GAP = "Competency Gap Efforts"
+COL_PRCR_STATE = "PRCRState"
 
 
 def _as_float(value) -> float | None:
@@ -67,40 +65,47 @@ def revised_estimation_column(columns) -> str | None:
     return None
 
 
-def _normalize_label(value) -> str:
-    return " ".join(str(value).strip().lower().replace(".", " ").split())
+def available_estimate_column(columns) -> str | None:
+    """Find the Actual Available Estimate column (CZ on current Scrum files)."""
+    for col in columns:
+        if _AVAILABLE_HEADER_TOKEN in _normalize_header(col):
+            return col
+    return None
 
 
-def _lookup_available_hours(ws) -> tuple[float | None, int | None]:
-    candidates: list[dict] = []
-    for row_idx in range(1, (ws.max_row or 0) + 1):
-        label = ws.cell(row_idx, 2).value
-        if not label or _AVAILABLE_LABEL not in _normalize_label(label):
-            continue
-        hours = _as_float(ws.cell(row_idx, 4).value)
-        if hours is None:
-            continue
-        members = _as_float(ws.cell(row_idx, 9).value)
-        candidates.append(
-            {
-                "hours": hours,
-                "members": int(round(members)) if members is not None else None,
-            }
-        )
+def scrum_available_hours(tracker: pd.DataFrame | None) -> int | None:
+    """
+    Quarter available hours from Non STLA.
 
-    if not candidates:
-        return None, None
+    Prefers a numeric cell in the Actual Available Estimate column; otherwise
+    parses the number from the column header (e.g. ``… "7152"``).
+    """
+    if tracker is None or tracker.empty:
+        return None
+    column = available_estimate_column(tracker.columns)
+    if not column:
+        return None
+    for value in tracker[column]:
+        hours = _as_float(value)
+        if hours is not None:
+            return int(round(hours))
+    match = _AVAILABLE_NUMBER.search(str(column))
+    if match:
+        return int(round(float(match.group(1))))
+    return None
 
-    with_members = [c for c in candidates if c["members"] is not None]
-    if len(with_members) >= 2:
-        max_members = max(c["members"] for c in with_members)
-        subsets = [c for c in with_members if c["members"] < max_members]
-        if subsets:
-            best = max(subsets, key=lambda c: c["hours"])
-            return best["hours"], best["members"]
 
-    best = with_members[-1] if with_members else candidates[-1]
-    return best["hours"], best["members"]
+def _prcr_state_blank(value) -> bool:
+    if value is None:
+        return True
+    try:
+        if isinstance(value, float) and value != value:
+            return True
+        if pd.isna(value):
+            return True
+    except (TypeError, ValueError):
+        pass
+    return str(value).strip().lower() in {"", "nan", "none", "nat"}
 
 
 def row_estimated_hours(row: pd.Series, revised_col: str | None = None) -> float | None:
@@ -121,7 +126,12 @@ def row_estimated_hours(row: pd.Series, revised_col: str | None = None) -> float
 
 
 def sum_scrum_estimated_hours(tracker: pd.DataFrame | None) -> int | None:
-    """Sum per-row estimated hours (revised when present) across the Scrum tracker."""
+    """
+    Sum estimated hours (revised when present) for rows with a PRCRState.
+
+    Blank / empty PRCRState rows are excluded. Evaluate, Implement, Task,
+    Task_NA, and any other non-blank state are kept.
+    """
     if tracker is None or tracker.empty:
         return None
     revised_col = revised_estimation_column(tracker.columns)
@@ -131,6 +141,8 @@ def sum_scrum_estimated_hours(tracker: pd.DataFrame | None) -> int | None:
     total = 0.0
     saw_any = False
     for _, row in tracker.iterrows():
+        if COL_PRCR_STATE in tracker.columns and _prcr_state_blank(row.get(COL_PRCR_STATE)):
+            continue
         hours = row_estimated_hours(row, revised_col=revised_col)
         if hours is None:
             continue
@@ -164,27 +176,16 @@ def sum_burndown_hours(tracker: pd.DataFrame | None) -> int | None:
 
 
 def load_quarterly_planning(
-    planning_book: str | Path | None = None,
+    planning_book=None,
     *,
     planned_pct: int = DEFAULT_PLANNED_BANDWIDTH_PCT,
     tracker: pd.DataFrame | None = None,
 ) -> dict[str, int] | None:
-    """
-    Build the three planning-bar metrics.
+    """Build the three planning-bar metrics from the Scrum tracker only."""
+    del planning_book, planned_pct
 
-    ``planned_pct`` is ignored for the second bar (kept for call-site compatibility).
-    """
-    del planned_pct  # second bar is Scrum estimates, not % of available
-
-    workbook_path = Path(planning_book) if planning_book else DEFAULT_PLANNING_BOOK
-    if not workbook_path.exists():
-        return None
-
-    wb = load_workbook(workbook_path, data_only=True)
-    ws = wb[wb.sheetnames[0]]
-
-    available_hours, resources = _lookup_available_hours(ws)
-    if available_hours is None:
+    available = scrum_available_hours(tracker)
+    if available is None:
         return None
 
     estimated_hours = sum_scrum_estimated_hours(tracker)
@@ -195,15 +196,13 @@ def load_quarterly_planning(
     if burndown_hours is None:
         burndown_hours = 0
 
-    available = int(round(available_hours))
     planned_pct = int(round((estimated_hours / available) * 100)) if available else 0
 
     return {
-        "available_hours": available,
-        # Second bar value (legacy key name kept for slide/chart callers).
+        "available_hours": int(available),
         "planned_hours": int(estimated_hours),
         "estimated_hours": int(estimated_hours),
         "burndown_hours": int(burndown_hours),
         "planned_pct": planned_pct,
-        "resources": resources if resources is not None else 0,
+        "resources": 0,
     }

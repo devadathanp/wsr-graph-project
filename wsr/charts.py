@@ -241,22 +241,32 @@ def _plot_section(
     return output_path
 
 
-def save_implementation_chart(output_path: str | Path, data_file: str = DEFAULT_DATA_FILE) -> Path:
+def save_implementation_chart(
+    output_path: str | Path,
+    data_file: str = DEFAULT_DATA_FILE,
+    *,
+    quarter_short: str = "Q3'26",
+) -> Path:
     section = get_implementation_data(data_file=data_file)
     return _plot_section(
         section,
-        title="Q3'26 Implementation",
+        title=f"{quarter_short} Implementation",
         progress_col=COL_IN_PROGRESS,
         progress_label="Impl In Progress",
         output_path=output_path,
     )
 
 
-def save_evaluation_chart(output_path: str | Path, data_file: str = DEFAULT_DATA_FILE) -> Path:
+def save_evaluation_chart(
+    output_path: str | Path,
+    data_file: str = DEFAULT_DATA_FILE,
+    *,
+    quarter_short: str = "Q3'26",
+) -> Path:
     section = get_evaluation_data(data_file=data_file)
     return _plot_section(
         section,
-        title="Q3'26 Evaluation",
+        title=f"{quarter_short} Evaluation",
         progress_col=COL_IN_PROGRESS,
         progress_label="Eval In Progress",
         output_path=output_path,
@@ -264,19 +274,23 @@ def save_evaluation_chart(output_path: str | Path, data_file: str = DEFAULT_DATA
 
 
 def save_planning_chart(
-    planning: dict[str, int],
+    planning: dict[str, int | str],
     output_path: str | Path,
 ) -> Path:
-    estimated = planning.get("estimated_hours", planning["planned_hours"])
-    available = planning["available_hours"]
-    burndown = planning.get("burndown_hours", 0)
+    estimated = int(planning.get("estimated_hours", planning["planned_hours"]))
+    available = int(planning["available_hours"])
+    burndown = int(planning.get("burndown_hours", 0))
     planned_pct = planning.get("planned_pct")
     if planned_pct is None:
         planned_pct = int(round((estimated / available) * 100)) if available else 0
+    else:
+        planned_pct = int(planned_pct)
 
+    quarter_token = str(planning.get("quarter_token", "Q3"))
+    fiscal_year = int(planning.get("fiscal_year", 2026))
     categories = [
-        "Q3 Actual Available",
-        f"{planned_pct}% of Q3 Planned",
+        f"{quarter_token} Actual Available",
+        f"{planned_pct}% of {quarter_token} Planned",
         "Burndown",
     ]
     values = [available, estimated, burndown]
@@ -284,7 +298,7 @@ def save_planning_chart(
     fig, ax = plt.subplots(figsize=(11.2, 4.6))
     bars = ax.bar(categories, values, color="#92D050", width=0.55)
     ax.set_title(
-        "PFS Quarterly Planning 2026",
+        f"PFS Quarterly Planning {fiscal_year}",
         fontdict={"fontsize": 14, "fontweight": "normal"},
         color="#161718",
         pad=12,

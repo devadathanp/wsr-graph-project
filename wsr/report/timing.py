@@ -6,8 +6,8 @@ from datetime import datetime
 from pathlib import Path
 
 from wsr.errors import WsrDataError
+from wsr.fiscal import fiscal_year, iso_week_number, quarter_label_long, quarter_label_short
 from wsr.graph import latest_reported_week
-from wsr.pending import pending_week_for_chart
 from wsr.report.models import ReportTiming
 from wsr.run_log import RunLog
 
@@ -30,15 +30,24 @@ def resolve_report_timing(
             )
         chart_week = detected_week
 
-    # Slide dates (title, footers, etc.) use the day the report is generated,
-    # not the graph-sheet week date. Chart week stays auto-detected separately.
+    # Slide dates, quarter, and heading week use the day the report is generated.
+    # Chart week stays auto-detected from the graph sheet.
     if report_date is None:
         report_date = datetime.now().strftime("%d-%m-%Y")
 
-    pending_week = pending_week_for_chart(chart_week)
-    log.info(f"Using chart week={chart_week}, report date={report_date}")
+    heading_week = iso_week_number(report_date)
+    quarter_long = quarter_label_long(report_date)
+    quarter_short = quarter_label_short(report_date)
+    year = fiscal_year(report_date)
+    log.info(
+        f"Using chart week={chart_week}, report date={report_date}, "
+        f"heading={quarter_long} week {heading_week}"
+    )
     return ReportTiming(
         chart_week=chart_week,
         report_date=report_date,
-        pending_week=pending_week,
+        pending_week=heading_week,
+        quarter_long=quarter_long,
+        quarter_short=quarter_short,
+        fiscal_year=year,
     )

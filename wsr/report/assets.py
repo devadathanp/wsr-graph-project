@@ -15,35 +15,34 @@ from wsr.run_log import RunLog
 def build_chart_assets(
     scrum_path: Path,
     assets_dir: Path,
-    planning_book_path: Path | None,
     log: RunLog,
     *,
-    planned_pct: int = 90,
     tracker: pd.DataFrame | None = None,
+    quarter_short: str = "Q3'26",
+    fiscal_year: int = 2026,
 ) -> ChartAssets:
     log.info("Building charts…")
     impl_chart = save_implementation_chart(
         assets_dir / "implementation_chart.png",
         data_file=str(scrum_path),
+        quarter_short=quarter_short,
     )
     eval_chart = save_evaluation_chart(
         assets_dir / "evaluation_chart.png",
         data_file=str(scrum_path),
+        quarter_short=quarter_short,
     )
 
-    quarterly_planning = load_quarterly_planning(
-        planning_book_path,
-        planned_pct=planned_pct,
-        tracker=tracker,
-    )
+    quarterly_planning = load_quarterly_planning(tracker=tracker)
     planning_chart = None
     if quarterly_planning is None:
-        if planning_book_path is not None:
-            log.warning(
-                f'Could not find "Total work Hrs. Available for PFS team" in '
-                f"{planning_book_path.name}; slide 11 will show a placeholder."
-            )
+        log.warning(
+            'Could not find Actual Available Estimate on Non STLA; '
+            "the quarterly planning slide will show a placeholder."
+        )
     else:
+        quarterly_planning["quarter_token"] = quarter_short.split("'")[0]
+        quarterly_planning["fiscal_year"] = fiscal_year
         planning_chart = save_planning_chart(
             quarterly_planning,
             assets_dir / "planning_chart.png",
@@ -52,8 +51,7 @@ def build_chart_assets(
             f"Planning chart: available={quarterly_planning['available_hours']}, "
             f"estimated_hrs={quarterly_planning['estimated_hours']} "
             f"({quarterly_planning['planned_pct']}% of available), "
-            f"burndown={quarterly_planning['burndown_hours']}, "
-            f"resources={quarterly_planning['resources']}"
+            f"burndown={quarterly_planning['burndown_hours']}"
         )
 
     return ChartAssets(

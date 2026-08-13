@@ -36,9 +36,7 @@ what “success” vs “warning” vs “error” looks like.
 
 | Input | Typical file | Role |
 | --- | --- | --- |
-| Scrum workbook | `SCRUM_PFS_….xlsm` | Charts, pending DCRs, DDP, tracker, visibility |
-| Planning workbook | `Book2.xlsx` | Quarterly planning slide (optional) |
-| Planned quarter % | GUI field (default 90) | Slide 11: planned hours = this % of available |
+| Scrum workbook | `SCRUM_PFS_….xlsm` | Charts, pending DCRs, DDP, ECM, tracker, visibility, quarterly planning |
 | PPT template | bundled in the app | Branding / layouts |
 
 | Output | Role |

@@ -21,6 +21,7 @@ from wsr.report.models import ChartAssets, ReportTiming, ScrumWorkbook
 from wsr.report_data import summary_table_rows
 from wsr.report_data.action_items import action_items
 from wsr.report_data.ddp import ddp_ms45_items
+from wsr.report_data.ecm import ecm_testing_items
 from wsr.report_data.handoff import eval_handoff_items
 from wsr.report_data.risks import active_risk_items
 from wsr.run_log import RunLog
@@ -29,6 +30,7 @@ from wsr.slides import (
     add_closing_slide,
     add_dcr_status_slide,
     add_ddp_slide,
+    add_ecm_slide,
     add_handoff_slide,
     add_mom_slide,
     add_pending_slide,
@@ -74,6 +76,12 @@ def build_presentation(
     ddp_items = ddp_ms45_items(workbook.tracker, rich_runs=tracker_rich)
     log.info(f"Active DDP MS4-5 rows (testing needed, not closed): {len(ddp_items)}")
 
+    ecm_items = ecm_testing_items(workbook.tracker, rich_runs=tracker_rich)
+    log.info(
+        "ECM testing rows (needed = Yes; status At Risk / In Progress / "
+        f"On Hold / Yet to Start): {len(ecm_items)}"
+    )
+
     handoff_items = eval_handoff_items(workbook.tracker, rich_runs=tracker_rich)
     log.info(f"Eval handoff rows (Onsite Evaluator = Yes): {len(handoff_items)}")
 
@@ -94,6 +102,7 @@ def build_presentation(
 
     report_date = timing.report_date
     pending_week = timing.pending_week
+    quarter = timing.quarter_long
 
     add_title_slide(prs, report_date)
     add_agenda_slide(prs, report_date)
@@ -103,7 +112,7 @@ def build_presentation(
     slide_no = 5
     eval_pages = add_pending_slide(
         prs,
-        f"Q3-2026 – Evaluations pending for closure for week {pending_week}",
+        f"{quarter} – Evaluations pending for closure for week {pending_week}",
         report_date,
         slide_no,
         eval_pending,
@@ -114,7 +123,7 @@ def build_presentation(
 
     impl_pages = add_pending_slide(
         prs,
-        f"Q3-2026 – Implementation pending for closure for week {pending_week}",
+        f"{quarter} – Implementation pending for closure for week {pending_week}",
         report_date,
         slide_no,
         impl_pending,
@@ -125,7 +134,16 @@ def build_presentation(
 
     add_ddp_slide(prs, report_date, ddp_items, slide_number=slide_no)
     slide_no += 1
-    add_handoff_slide(prs, report_date, handoff_items, slide_number=slide_no)
+    ecm_pages = add_ecm_slide(prs, report_date, ecm_items, slide_number=slide_no)
+    log.info(f"ECM testing split across {ecm_pages} slide(s)")
+    slide_no += ecm_pages
+    add_handoff_slide(
+        prs,
+        report_date,
+        handoff_items,
+        slide_number=slide_no,
+        quarter_label=quarter,
+    )
     slide_no += 1
     add_risks_slide(prs, report_date, risk_items, slide_number=slide_no)
     slide_no += 1
@@ -135,6 +153,8 @@ def build_presentation(
         charts.quarterly_planning,
         chart_image=charts.planning_chart,
         slide_number=slide_no,
+        quarter_label=quarter,
+        fiscal_year=timing.fiscal_year,
     )
     slide_no += 1
     add_closing_slide(

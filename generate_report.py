@@ -9,7 +9,7 @@ import sys
 from wsr.constants import DEFAULT_DATA_FILE
 from wsr.errors import WsrDataError
 from wsr.graph import latest_reported_week
-from wsr.pending import pending_week_for_chart
+from wsr.fiscal import iso_week_number, quarter_label_long
 from wsr.report import generate_report
 from wsr_style import DEFAULT_TEMPLATE
 
@@ -22,14 +22,15 @@ def main():
         "--week",
         type=int,
         default=None,
-        help="Chart week number (auto-detected from the graph sheet if omitted; "
-        "pending table titles use the same week)",
+        help="Chart week number (auto-detected from the graph sheet if omitted). "
+        "Slide headings use the ISO week of the report date instead.",
     )
     parser.add_argument(
         "--date",
         default=None,
         help="Report date dd-mm-yyyy (shown on slides; also used as the Planned "
-        "Completion cutoff for evaluation/implementation pending on slides 5–6). "
+        "Completion cutoff for evaluation/implementation pending on slides 5–6, "
+        "and to derive the fiscal quarter and heading week). "
         "Defaults to today's date if omitted.",
     )
     parser.add_argument("--assets-dir", default="report_assets", help="Directory for chart images")
@@ -41,13 +42,13 @@ def main():
     parser.add_argument(
         "--planning-book",
         default=None,
-        help="Quarterly planning workbook for slide 11 (default: ./Book2.xlsx)",
+        help=argparse.SUPPRESS,  # legacy; planning now comes from the Scrum sheet
     )
     parser.add_argument(
         "--planned-pct",
         type=int,
         default=90,
-        help=argparse.SUPPRESS,  # legacy; second planning bar uses Scrum Estimated Hrs
+        help=argparse.SUPPRESS,  # legacy; unused
     )
     parser.add_argument(
         "--template",
@@ -74,8 +75,6 @@ def main():
             assets_dir=args.assets_dir,
             template_path=args.template,
             closing_image=args.closing_image,
-            planning_book=args.planning_book,
-            planned_pct=args.planned_pct,
         )
     except WsrDataError as exc:
         print(f"Error: {exc}", file=sys.stderr)
@@ -86,8 +85,15 @@ def main():
     print(f"Report generated: {result.output_path}")
     print(f"Log: {result.log_path}")
     print(f"Template: {args.template}")
-    if week is not None:
-        print(f"Chart week: {week} | Pending tables week: {pending_week_for_chart(week)}")
+    heading_date = args.date
+    if heading_date is None:
+        from datetime import datetime
+
+        heading_date = datetime.now().strftime("%d-%m-%Y")
+    print(
+        f"Chart week: {week} | "
+        f"Heading: {quarter_label_long(heading_date)} week {iso_week_number(heading_date)}"
+    )
     if result.warnings:
         print(f"Warnings ({len(result.warnings)}):")
         for warning in result.warnings:

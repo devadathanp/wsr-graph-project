@@ -28,6 +28,7 @@ from wsr.pending import (
 from wsr.report_data import (
     core2_planned_count,
     ddp_ms45_items,
+    ecm_testing_items,
     discussion_points,
     eval_handoff_items,
     planning_dcr_column,
@@ -71,6 +72,7 @@ __all__ = [
     "closure_date_from_row",
     "closure_sort_key",
     "ddp_ms45_items",
+    "ecm_testing_items",
     "discussion_points",
     "eval_handoff_items",
     "eval_status_from_row",

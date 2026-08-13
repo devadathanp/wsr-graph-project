@@ -7,6 +7,7 @@ from wsr.slides.planning import add_planning_slide
 from wsr.slides.risks import add_risks_slide
 from wsr.slides.tables import (
     add_ddp_slide,
+    add_ecm_slide,
     add_handoff_slide,
     add_pending_slide,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "add_closing_slide",
     "add_dcr_status_slide",
     "add_ddp_slide",
+    "add_ecm_slide",
     "add_handoff_slide",
     "add_mom_slide",
     "add_pending_slide",

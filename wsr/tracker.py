@@ -111,9 +111,9 @@ def format_ordinal_day_month(value) -> str:
 
 
 def format_quarter_label(value) -> str:
-    parsed = pd.to_datetime(value, dayfirst=True)
-    quarter = (int(parsed.month) - 1) // 3 + 1
-    return f"Q{quarter}'{parsed.strftime('%y')}"
+    from wsr.fiscal import quarter_label_short
+
+    return quarter_label_short(value)
 
 
 def latest_comment(comments: str | float, max_len: int | None = 120) -> str:

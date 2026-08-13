@@ -113,6 +113,31 @@ def find_placeholder(slide, idx: int | None = None, name_contains: str | None = 
     return None
 
 
+def remove_subtitle_placeholders(slide) -> None:
+    """Drop unused template subtitle boxes (e.g. 'Subtitle goes here')."""
+    to_remove = []
+    for shape in list(slide.shapes):
+        if not shape.is_placeholder:
+            continue
+        name = (shape.name or "").lower()
+        text = ""
+        if shape.has_text_frame:
+            text = shape.text_frame.text.strip().lower()
+        idx = shape.placeholder_format.idx
+        # Content layout stores the subtitle as idx 12 ("Text Placeholder").
+        if (
+            "subtitle" in name
+            or text == "subtitle goes here"
+            or (idx == 12 and "date" not in name and "footer" not in name and "number" not in name)
+        ):
+            to_remove.append(shape)
+    for shape in to_remove:
+        element = shape._element
+        parent = element.getparent()
+        if parent is not None:
+            parent.remove(element)
+
+
 def _footer_placeholder(slide, idx_candidates: list[int], name_hint: str):
     for idx in idx_candidates:
         ph = find_placeholder(slide, idx=idx)

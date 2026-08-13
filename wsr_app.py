@@ -42,7 +42,6 @@ class WsrApp(tk.Tk):
         self.configure(padx=18, pady=16)
 
         self.scrum_var = tk.StringVar()
-        self.planning_var = tk.StringVar()
         self.status_var = tk.StringVar(value="Select your Scrum workbook to begin.")
 
         self._build_ui()
@@ -51,17 +50,16 @@ class WsrApp(tk.Tk):
         header = ttk.Label(self, text="Weekly Status Report Generator", font=("Segoe UI", 15, "bold"))
         header.grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 12))
 
-        self._file_row(1, "Scrum workbook *", self.scrum_var, self._pick_scrum)
-        self._file_row(2, "Planning workbook", self.planning_var, self._pick_planning)
+        self._file_row(1, "Scrum workbook", self.scrum_var, self._pick_scrum)
 
         self.progress = ttk.Progressbar(self, mode="indeterminate", length=420)
-        self.progress.grid(row=3, column=0, columnspan=3, sticky="we", pady=(10, 4))
+        self.progress.grid(row=2, column=0, columnspan=3, sticky="we", pady=(10, 4))
 
         self.status = ttk.Label(self, textvariable=self.status_var, foreground="#333", wraplength=460)
-        self.status.grid(row=4, column=0, columnspan=3, sticky="w")
+        self.status.grid(row=3, column=0, columnspan=3, sticky="w")
 
         self.generate_btn = ttk.Button(self, text="Generate WSR", command=self._on_generate)
-        self.generate_btn.grid(row=5, column=0, columnspan=3, sticky="e", pady=(14, 0))
+        self.generate_btn.grid(row=4, column=0, columnspan=3, sticky="e", pady=(14, 0))
 
         self.columnconfigure(1, weight=1)
 
@@ -78,18 +76,8 @@ class WsrApp(tk.Tk):
         self.scrum_var.set(path)
         self._autofill_from_scrum(Path(path))
 
-    def _pick_planning(self) -> None:
-        path = filedialog.askopenfilename(title="Select the Planning workbook", filetypes=EXCEL_TYPES)
-        if path:
-            self.planning_var.set(path)
-
     def _autofill_from_scrum(self, scrum: Path) -> None:
-        if not self.planning_var.get():
-            for name in ("Book2.xlsx", "Planning.xlsx", "Planning.xlsm"):
-                candidate = scrum.parent / name
-                if candidate.exists():
-                    self.planning_var.set(str(candidate))
-                    break
+        del scrum
         self.status_var.set("Ready. Click 'Generate WSR'.")
 
     @staticmethod
@@ -107,7 +95,6 @@ class WsrApp(tk.Tk):
         now = datetime.now()
         report_date = now.strftime("%d-%m-%Y")
         output = str(self._timestamped_output_path(Path(scrum)))
-        planning = self.planning_var.get().strip() or None
 
         self.generate_btn.config(state="disabled")
         self.progress.start(12)
@@ -115,7 +102,7 @@ class WsrApp(tk.Tk):
 
         thread = threading.Thread(
             target=self._run_generation,
-            args=(scrum, planning, output, report_date),
+            args=(scrum, output, report_date),
             daemon=True,
         )
         thread.start()
@@ -123,7 +110,6 @@ class WsrApp(tk.Tk):
     def _run_generation(
         self,
         scrum: str,
-        planning: str | None,
         output: str,
         report_date: str,
     ) -> None:
@@ -138,7 +124,6 @@ class WsrApp(tk.Tk):
                 output_path=output,
                 data_file=scrum,
                 assets_dir=assets_dir,
-                planning_book=planning,
                 report_date=report_date,
                 log_path=log_path,
             )

@@ -3,6 +3,7 @@
 from wsr.report_data.action_items import action_items
 from wsr.report_data.ddp import ddp_ms45_items
 from wsr.report_data.discussion import discussion_points
+from wsr.report_data.ecm import ecm_testing_items
 from wsr.report_data.handoff import eval_handoff_items
 from wsr.report_data.planning import (
     core2_planned_count,
@@ -20,6 +21,7 @@ __all__ = [
     "core2_planned_count",
     "ddp_ms45_items",
     "discussion_points",
+    "ecm_testing_items",
     "eval_handoff_items",
     "planning_dcr_column",
     "planning_dcr_ids",

@@ -15,7 +15,7 @@ from wsr.report.models import ReportResult
 from wsr.report.timing import resolve_report_timing
 from wsr.report.workbook import load_scrum_workbook
 from wsr.run_log import RunLog, default_log_path
-from wsr.validate import validate_planning_book, validate_scrum_workbook
+from wsr.validate import validate_scrum_workbook
 from wsr_style import DEFAULT_TEMPLATE
 
 
@@ -31,6 +31,7 @@ def generate_report(
     planned_pct: int = DEFAULT_PLANNED_BANDWIDTH_PCT,
     log_path: str | Path | None = None,
 ) -> ReportResult:
+    del planning_book, planned_pct
     output_path = Path(output_path)
     log_file = Path(log_path) if log_path else default_log_path(output_path)
     log = RunLog(log_file)
@@ -44,8 +45,6 @@ def generate_report(
             assets_dir=assets_dir,
             template_path=template_path,
             closing_image=closing_image,
-            planning_book=planning_book,
-            planned_pct=planned_pct,
             log=log,
         )
     except WsrDataError as exc:
@@ -69,8 +68,6 @@ def _generate_report(
     assets_dir: str | Path,
     template_path: str | Path,
     closing_image: str | Path | None,
-    planning_book: str | Path | None,
-    planned_pct: int,
     log: RunLog,
 ) -> ReportResult:
     assets_dir = Path(assets_dir)
@@ -80,7 +77,6 @@ def _generate_report(
     log.info(f"Output: {output_path}")
     log.info(f"Report date arg: {report_date!r}; chart week arg: {chart_week!r}")
     scrum_path = validate_scrum_workbook(data_file, log)
-    planning_book_path = validate_planning_book(planning_book, log)
 
     timing = resolve_report_timing(
         scrum_path,
@@ -92,10 +88,10 @@ def _generate_report(
     charts = build_chart_assets(
         scrum_path,
         assets_dir,
-        planning_book_path,
         log,
-        planned_pct=planned_pct,
         tracker=workbook.tracker,
+        quarter_short=timing.quarter_short,
+        fiscal_year=timing.fiscal_year,
     )
     prs = build_presentation(
         template_path=Path(template_path),

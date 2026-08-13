@@ -14,10 +14,7 @@ one click on **Windows**, with no Python or command line.
 2. Double-click `WSR-Generator.exe`.
 3. **Browse** to your **Scrum workbook** (the `.xlsm`/`.xlsx` with the
    `CSAR_WSR_Graph (Non-STLA)` sheet).
-4. Optionally browse to the **Planning workbook** (for the quarterly planning
-   slide). If it sits next to the Scrum file as `Book2.xlsx`, it's picked up
-   automatically.
-5. Click **Generate WSR**. The report week and date are detected automatically
+4. Click **Generate WSR**. The report week and date are detected automatically
    from the sheet. When it finishes you're offered to open the `.pptx`.
 
 > **First launch:** Windows SmartScreen may warn → "More info" → "Run anyway"
@@ -27,8 +24,7 @@ one click on **Windows**, with no Python or command line.
 
 | App field         | File                          | Used for                                   |
 | ----------------- | ----------------------------- | ------------------------------------------ |
-| Scrum workbook    | `data.xlsm`                   | Charts, DCR tables, status, DDP, handoff   |
-| Planning workbook | `Book2.xlsx`                  | Quarterly planning slide (optional)        |
+| Scrum workbook    | `data.xlsm`                   | Charts, DCR tables, status, DDP, ECM, handoff, quarterly planning |
 
 The reporting **week** and **date** are read from the latest populated week in
 the `CSAR_WSR_Graph (Non-STLA)` sheet — no manual entry required.
