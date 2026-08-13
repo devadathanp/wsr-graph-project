@@ -49,8 +49,9 @@ def _safe_int(value) -> int | None:
 
 
 def load_graph_sheet(data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
+    """Load the graph sheet as a raw grid (no header row assumed)."""
     try:
-        return pd.read_excel(data_file, sheet_name=GRAPH_SHEET, header=2)
+        return pd.read_excel(data_file, sheet_name=GRAPH_SHEET, header=None)
     except ValueError as exc:
         raise WsrDataError(
             f'Sheet "{GRAPH_SHEET}" not found or unreadable in {Path(data_file).name}:\n{exc}'
@@ -78,47 +79,83 @@ def load_graph_summary(data_file: str = DEFAULT_DATA_FILE) -> dict:
     }
 
 
-def get_evaluation_data(df: pd.DataFrame | None = None, data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
-    if df is None:
-        df = load_graph_sheet(data_file)
+def _cell_text(value) -> str:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return ""
+    return " ".join(str(value).replace("\n", " ").split()).lower()
 
-    if "Tagged to Release" not in df.columns:
+
+def _is_main_table_title(value, keyword: str) -> bool:
+    """True only for the table's main title, e.g. 'Evaluation' or 'Implementation'.
+
+    Ignores Tagged-to-Release cells like 'Q3-2026 Evaluation'.
+    """
+    return _cell_text(value) == keyword
+
+
+def _row_has_title(row, keyword: str | None = None) -> bool:
+    keywords = (keyword,) if keyword else ("evaluation", "implementation")
+    return any(
+        _is_main_table_title(value, word)
+        for value in row
+        for word in keywords
+    )
+
+
+def _find_title_row(raw: pd.DataFrame, keyword: str) -> int:
+    for idx, row in raw.iterrows():
+        if _row_has_title(row, keyword):
+            return int(idx)
+    raise WsrDataError(
+        f'Could not find the "{keyword.title()}" table on sheet "{GRAPH_SHEET}". '
+        f'Look for a table titled "{keyword.title()}" '
+        "(not the Q3/Q4 text in Tagged to Release)."
+    )
+
+
+def _header_names(row) -> list[str]:
+    names: list[str] = []
+    for col, value in enumerate(row):
+        text = str(value).strip() if pd.notna(value) else ""
+        names.append(text or f"Unnamed: {col}")
+    return names
+
+
+def _table_named(raw: pd.DataFrame, keyword: str) -> pd.DataFrame:
+    title_row = _find_title_row(raw, keyword)
+    header_row = title_row + 1
+    if header_row >= len(raw):
         raise WsrDataError(
-            f'Column "Tagged to Release" missing on sheet "{GRAPH_SHEET}".'
+            f'Table "{keyword.title()}" on sheet "{GRAPH_SHEET}" has no header row.'
         )
 
-    impl_header_idx = df.index[df["Tagged to Release"].astype(str).str.strip() == "Implementation"]
-    if len(impl_header_idx) == 0:
+    end = len(raw)
+    for idx in range(header_row + 1, len(raw)):
+        if _row_has_title(raw.iloc[idx]):
+            end = idx
+            break
+
+    headers = _header_names(raw.iloc[header_row])
+    section = raw.iloc[header_row + 1 : end].copy()
+    section.columns = headers
+    if COL_WEEK not in section.columns:
         raise WsrDataError(
-            f'Could not find the "Implementation" section on sheet "{GRAPH_SHEET}".'
+            f'Table "{keyword.title()}" on sheet "{GRAPH_SHEET}" is missing "{COL_WEEK}".'
         )
-    eval_df = df.loc[: impl_header_idx[0] - 1]
-    section = eval_df[eval_df[COL_WEEK].notna()].copy()
+    week_no = pd.to_numeric(section[COL_WEEK], errors="coerce")
+    section = section[week_no.notna()].copy()
     section.reset_index(drop=True, inplace=True)
     return _coerce_graph_numeric(section)
+
+
+def get_evaluation_data(df: pd.DataFrame | None = None, data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
+    raw = df if df is not None else load_graph_sheet(data_file)
+    return _table_named(raw, "evaluation")
 
 
 def get_implementation_data(df: pd.DataFrame | None = None, data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
-    if df is None:
-        df = load_graph_sheet(data_file)
-
-    if "Tagged to Release" not in df.columns:
-        raise WsrDataError(
-            f'Column "Tagged to Release" missing on sheet "{GRAPH_SHEET}".'
-        )
-
-    impl_start_idx = df.index[
-        df["Tagged to Release"].astype(str).str.contains("Q3", na=False)
-        & df["Tagged to Release"].astype(str).str.contains("Implementation", na=False)
-    ]
-    if len(impl_start_idx) == 0:
-        raise WsrDataError(
-            f'Could not find the Q3 Implementation block on sheet "{GRAPH_SHEET}".'
-        )
-    section = df.loc[impl_start_idx[0] :]
-    section = section[section[COL_WEEK].notna()].copy()
-    section.reset_index(drop=True, inplace=True)
-    return _coerce_graph_numeric(section)
+    raw = df if df is not None else load_graph_sheet(data_file)
+    return _table_named(raw, "implementation")
 
 
 def _coerce_graph_numeric(section: pd.DataFrame) -> pd.DataFrame:

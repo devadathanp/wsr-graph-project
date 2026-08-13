@@ -60,7 +60,7 @@ def add_risks_slide(
     slide_number: int = 9,
 ) -> None:
     slide = new_content_slide(prs, "Risks & Mitigation Plan", report_date, slide_number)
-    headers = ["#", "DCR", "Risk / Issue", "Impact", "Support Required", "Status"]
+    headers = ["#", "DCR", "Risk / Issue", "Impact", "Support Required", "Status", "RAG Status"]
     rows = [
         [
             str(i + 1),
@@ -69,16 +69,18 @@ def add_risks_slide(
             item.get("impact", ""),
             item.get("support", ""),
             item.get("status", ""),
+            "",
         ]
         for i, item in enumerate(items or [])
     ]
     if not rows:
         rows = [empty_row(len(headers))]
+        rows[0][-1] = ""
 
     add_table(
         slide,
         headers,
         rows,
-        col_widths=[0.45, 1.0, 4.2, 1.6, 2.5, 1.25],
+        col_widths=[0.45, 0.95, 3.7, 1.45, 2.2, 1.15, 1.2],
     )
     _add_impact_legend(slide)

@@ -118,26 +118,20 @@ def validate_scrum_workbook(data_file: str | Path, log: RunLog | None = None) ->
 
     try:
         graph = load_graph_sheet(str(path))
+        eval_section = get_evaluation_data(graph)
+        impl_section = get_implementation_data(graph)
     except Exception as exc:
         raise WsrDataError(
             f'Could not read sheet "{GRAPH_SHEET}" in {path.name}:\n{exc}'
         ) from exc
 
-    missing_graph = [col for col in GRAPH_REQUIRED_COLUMNS if col not in graph.columns]
+    missing_graph = [col for col in GRAPH_REQUIRED_COLUMNS if col not in eval_section.columns]
     if missing_graph:
         raise WsrDataError(
             f'Required column(s) missing on sheet "{GRAPH_SHEET}":\n'
             + "\n".join(f"  - {col!r}" for col in missing_graph)
             + f"\n\nWorkbook: {path.name}"
         )
-
-    try:
-        eval_section = get_evaluation_data(graph)
-        impl_section = get_implementation_data(graph)
-    except Exception as exc:
-        raise WsrDataError(
-            f'Graph sheet "{GRAPH_SHEET}" looks corrupt or incomplete in {path.name}:\n{exc}'
-        ) from exc
 
     if eval_section.empty:
         raise WsrDataError(
