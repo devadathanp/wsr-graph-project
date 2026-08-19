@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from wsr.errors import WsrDataError
-from wsr.fiscal import fiscal_year, iso_week_number, quarter_label_long, quarter_label_short
+from wsr.fiscal import fiscal_year, iso_week_number, last_friday, quarter_label_long, quarter_label_short
 from wsr.graph import latest_reported_week
 from wsr.report.models import ReportTiming
 from wsr.run_log import RunLog
@@ -19,7 +19,10 @@ def resolve_report_timing(
     report_date: str | None,
     log: RunLog,
 ) -> ReportTiming:
-    detected_week, _ = latest_reported_week(str(scrum_path))
+    if report_date is None:
+        report_date = datetime.now().strftime("%d-%m-%Y")
+
+    detected_week, _ = latest_reported_week(str(scrum_path), report_date=report_date)
     log.info(f"Detected week={detected_week!r}")
 
     if chart_week is None:
@@ -31,16 +34,14 @@ def resolve_report_timing(
         chart_week = detected_week
 
     # Slide dates, quarter, and heading week use the day the report is generated.
-    # Chart week stays auto-detected from the graph sheet.
-    if report_date is None:
-        report_date = datetime.now().strftime("%d-%m-%Y")
-
+    # Graph charts include weeks through the last Friday on or before report_date.
     heading_week = iso_week_number(report_date)
     quarter_long = quarter_label_long(report_date)
     quarter_short = quarter_label_short(report_date)
     year = fiscal_year(report_date)
     log.info(
         f"Using chart week={chart_week}, report date={report_date}, "
+        f"graph through {last_friday(report_date):%d-%m-%Y}, "
         f"heading={quarter_long} week {heading_week}"
     )
     return ReportTiming(

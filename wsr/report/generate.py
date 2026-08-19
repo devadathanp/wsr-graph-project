@@ -92,6 +92,7 @@ def _generate_report(
         tracker=workbook.tracker,
         quarter_short=timing.quarter_short,
         fiscal_year=timing.fiscal_year,
+        report_date=timing.report_date,
     )
     prs = build_presentation(
         template_path=Path(template_path),

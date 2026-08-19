@@ -30,8 +30,8 @@ CHART_COMPLETED = "#00B050"
 CHART_REJECTED = "#FFC000"
 CHART_IN_PROGRESS = "#FFFF00"
 CHART_DRB = "#00B0F0"
-CHART_CONFIDENCE = "#8064A2"
-CHART_ACTUAL = "#7030A0"
+CHART_CONFIDENCE = "#161718"  # flat high-% line (% Completion Confidence)
+CHART_ACTUAL = "#7030A0"  # % Actual weekly completion w.r.t revised Baseline
 
 DRB_COLUMN = COL_DRB
 
@@ -44,6 +44,13 @@ def _label_bars(ax, bars_groups, bar_max: float, ylim_top: float) -> None:
     max_above_y = ylim_top * 0.72
     n_weeks = len(bars_groups[0]) if bars_groups else 0
 
+    # First three (green) bars: baseline bottom, revised middle, completed upper.
+    green_label_anchor = (
+        (0.12, "bottom"),
+        (0.50, "center"),
+        (0.88, "top"),
+    )
+
     for week_idx in range(n_weeks):
         above_slot = 0
         for series_idx, bars in enumerate(bars_groups):
@@ -54,8 +61,25 @@ def _label_bars(ax, bars_groups, bar_max: float, ylim_top: float) -> None:
             x = bar.get_x() + bar.get_width() / 2
             value = f"{int(round(height))}"
 
+            if series_idx < len(green_label_anchor):
+                frac, va = green_label_anchor[series_idx]
+                y = max(height * frac, 0.6)
+                ax.text(
+                    x,
+                    y,
+                    value,
+                    ha="center",
+                    va=va,
+                    fontsize=6.5,
+                    color="#161718",
+                    zorder=5,
+                    clip_on=False,
+                    path_effects=_LABEL_STROKE,
+                )
+                continue
+
             place_inside = height >= inside_min and (
-                series_idx in (0, 2) or height + max(bar_max * 0.05, 2) > max_above_y
+                height + max(bar_max * 0.05, 2) > max_above_y
             )
             if place_inside:
                 ax.text(
@@ -246,8 +270,9 @@ def save_implementation_chart(
     data_file: str = DEFAULT_DATA_FILE,
     *,
     quarter_short: str = "Q3'26",
+    report_date: str | None = None,
 ) -> Path:
-    section = get_implementation_data(data_file=data_file)
+    section = get_implementation_data(data_file=data_file, report_date=report_date)
     return _plot_section(
         section,
         title=f"{quarter_short} Implementation",
@@ -262,8 +287,9 @@ def save_evaluation_chart(
     data_file: str = DEFAULT_DATA_FILE,
     *,
     quarter_short: str = "Q3'26",
+    report_date: str | None = None,
 ) -> Path:
-    section = get_evaluation_data(data_file=data_file)
+    section = get_evaluation_data(data_file=data_file, report_date=report_date)
     return _plot_section(
         section,
         title=f"{quarter_short} Evaluation",

@@ -9,6 +9,7 @@ import pandas as pd
 
 from wsr.constants import DEFAULT_DATA_FILE, GRAPH_SHEET
 from wsr.errors import WsrDataError
+from wsr.fiscal import last_friday
 
 COL_WEEK = "Week No"
 COL_DATE = "Date"
@@ -148,14 +149,41 @@ def _table_named(raw: pd.DataFrame, keyword: str) -> pd.DataFrame:
     return _coerce_graph_numeric(section)
 
 
-def get_evaluation_data(df: pd.DataFrame | None = None, data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
-    raw = df if df is not None else load_graph_sheet(data_file)
-    return _table_named(raw, "evaluation")
+def filter_section_through_friday(section: pd.DataFrame, report_date) -> pd.DataFrame:
+    """Keep graph rows through the last Friday on or before ``report_date``."""
+    if section.empty or COL_DATE not in section.columns:
+        return section
+    cutoff = last_friday(report_date)
+    dates = pd.to_datetime(section[COL_DATE], errors="coerce").dt.normalize()
+    filtered = section[dates.notna() & (dates <= cutoff)].copy()
+    filtered.reset_index(drop=True, inplace=True)
+    return filtered
 
 
-def get_implementation_data(df: pd.DataFrame | None = None, data_file: str = DEFAULT_DATA_FILE) -> pd.DataFrame:
+def get_evaluation_data(
+    df: pd.DataFrame | None = None,
+    data_file: str = DEFAULT_DATA_FILE,
+    *,
+    report_date=None,
+) -> pd.DataFrame:
     raw = df if df is not None else load_graph_sheet(data_file)
-    return _table_named(raw, "implementation")
+    section = _table_named(raw, "evaluation")
+    if report_date is not None:
+        section = filter_section_through_friday(section, report_date)
+    return section
+
+
+def get_implementation_data(
+    df: pd.DataFrame | None = None,
+    data_file: str = DEFAULT_DATA_FILE,
+    *,
+    report_date=None,
+) -> pd.DataFrame:
+    raw = df if df is not None else load_graph_sheet(data_file)
+    section = _table_named(raw, "implementation")
+    if report_date is not None:
+        section = filter_section_through_friday(section, report_date)
+    return section
 
 
 def _coerce_graph_numeric(section: pd.DataFrame) -> pd.DataFrame:
@@ -179,11 +207,16 @@ def _coerce_graph_numeric(section: pd.DataFrame) -> pd.DataFrame:
 
 def latest_reported_week(
     data_file: str = DEFAULT_DATA_FILE,
+    *,
+    report_date=None,
 ) -> tuple[int | None, str | None]:
     df = load_graph_sheet(data_file)
     week: int | None = None
     date_label: str | None = None
-    for section in (get_evaluation_data(df), get_implementation_data(df)):
+    for section in (
+        get_evaluation_data(df, report_date=report_date),
+        get_implementation_data(df, report_date=report_date),
+    ):
         reported = section[section[COL_PCT_ACTUAL].notna()]
         if reported.empty:
             continue

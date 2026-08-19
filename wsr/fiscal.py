@@ -29,6 +29,13 @@ def parse_report_date(value) -> datetime:
     return parsed.to_pydatetime()
 
 
+def last_friday(value) -> pd.Timestamp:
+    """Most recent Friday on or before the report / system date."""
+    ts = pd.Timestamp(parse_report_date(value)).normalize()
+    days_since_friday = (ts.weekday() - 4) % 7
+    return ts - pd.Timedelta(days=days_since_friday)
+
+
 def fiscal_quarter_and_year(value) -> tuple[int, int]:
     dt = parse_report_date(value)
     month = int(dt.month)

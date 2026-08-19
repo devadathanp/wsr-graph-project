@@ -15,7 +15,7 @@ DCR_SUMMARY_TOP = 0.70
 DCR_TITLE_TOP = 0.26
 
 AGENDA_ITEMS = [
-    "Action Items",
+    "Action Items from previous meetings",
     "DCR Status",
     "Issues and Risks",
 ]

@@ -20,17 +20,20 @@ def build_chart_assets(
     tracker: pd.DataFrame | None = None,
     quarter_short: str = "Q3'26",
     fiscal_year: int = 2026,
+    report_date: str | None = None,
 ) -> ChartAssets:
     log.info("Building charts…")
     impl_chart = save_implementation_chart(
         assets_dir / "implementation_chart.png",
         data_file=str(scrum_path),
         quarter_short=quarter_short,
+        report_date=report_date,
     )
     eval_chart = save_evaluation_chart(
         assets_dir / "evaluation_chart.png",
         data_file=str(scrum_path),
         quarter_short=quarter_short,
+        report_date=report_date,
     )
 
     quarterly_planning = load_quarterly_planning(tracker=tracker)

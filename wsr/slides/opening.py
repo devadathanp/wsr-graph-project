@@ -88,7 +88,7 @@ def add_mom_slide(
     report_date: str,
     items: list[dict] | None = None,
 ) -> None:
-    slide = new_content_slide(prs, "Action Items", report_date, 3)
+    slide = new_content_slide(prs, "Action Items from previous meetings", report_date, 3)
     headers = [
         "Sr. No.",
         "Action Items",
