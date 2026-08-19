@@ -21,6 +21,7 @@ from wsr.graph import (
     add_week_labels,
     get_evaluation_data,
     get_implementation_data,
+    mask_actual_through_friday,
     to_percentage,
 )
 
@@ -180,6 +181,7 @@ def _plot_section(
     progress_col: str,
     progress_label: str,
     output_path: str | Path,
+    report_date: str | None = None,
     figsize=(13.4, 4.65),
 ) -> Path:
     section = add_week_labels(section)
@@ -222,7 +224,7 @@ def _plot_section(
 
     ax2 = ax1.twinx()
     confidence = to_percentage(section[COL_PCT_CONFIDENCE]).to_numpy(dtype=float)
-    actual = to_percentage(section[COL_PCT_ACTUAL]).to_numpy(dtype=float)
+    actual = mask_actual_through_friday(section, section[COL_PCT_ACTUAL], report_date)
 
     ax2.plot(x, confidence, color=CHART_CONFIDENCE, linewidth=2.2, label="% Completion Confidence - Overall", zorder=3)
     ax2.plot(x, actual, color=CHART_ACTUAL, linewidth=2.2, label="% Actual weekly completion w.r.t revised Baseline", zorder=3)
@@ -272,13 +274,14 @@ def save_implementation_chart(
     quarter_short: str = "Q3'26",
     report_date: str | None = None,
 ) -> Path:
-    section = get_implementation_data(data_file=data_file, report_date=report_date)
+    section = get_implementation_data(data_file=data_file)
     return _plot_section(
         section,
         title=f"{quarter_short} Implementation",
         progress_col=COL_IN_PROGRESS,
         progress_label="Impl In Progress",
         output_path=output_path,
+        report_date=report_date,
     )
 
 
@@ -289,13 +292,14 @@ def save_evaluation_chart(
     quarter_short: str = "Q3'26",
     report_date: str | None = None,
 ) -> Path:
-    section = get_evaluation_data(data_file=data_file, report_date=report_date)
+    section = get_evaluation_data(data_file=data_file)
     return _plot_section(
         section,
         title=f"{quarter_short} Evaluation",
         progress_col=COL_IN_PROGRESS,
         progress_label="Eval In Progress",
         output_path=output_path,
+        report_date=report_date,
     )
 
 

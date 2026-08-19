@@ -34,7 +34,8 @@ def resolve_report_timing(
         chart_week = detected_week
 
     # Slide dates, quarter, and heading week use the day the report is generated.
-    # Graph charts include weeks through the last Friday on or before report_date.
+    # Bar charts and the confidence line use the full quarter table; the actual
+    # completion line stops at the last Friday on or before report_date.
     heading_week = iso_week_number(report_date)
     quarter_long = quarter_label_long(report_date)
     quarter_short = quarter_label_short(report_date)

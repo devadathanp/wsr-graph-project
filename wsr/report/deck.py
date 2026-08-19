@@ -112,7 +112,7 @@ def build_presentation(
     slide_no = 5
     eval_pages = add_pending_slide(
         prs,
-        f"{quarter} – Evaluations pending for closure for week {pending_week}",
+        f"{quarter} – Evaluations planned for closure for week {pending_week}",
         report_date,
         slide_no,
         eval_pending,
@@ -123,7 +123,7 @@ def build_presentation(
 
     impl_pages = add_pending_slide(
         prs,
-        f"{quarter} – Implementation pending for closure for week {pending_week}",
+        f"{quarter} – Implementation planned for closure for week {pending_week}",
         report_date,
         slide_no,
         impl_pending,

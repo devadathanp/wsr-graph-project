@@ -7,7 +7,6 @@ import pandas as pd
 from wsr.constants import DEFAULT_DATA_FILE, PENDING_TABLE_ROW_CAP
 from wsr.graph import get_evaluation_data, get_implementation_data
 from wsr.tracker import (
-    closure_date_from_row,
     coerce_tracker_date,
     eval_status_from_row,
     impl_status_from_row,
@@ -40,12 +39,15 @@ def build_pending_item(
     vis_row = visibility_row(visibility, dcr_id)
     summary = tracker_row.get("Summary", vis_row.get("Subject", "-") if vis_row is not None else "-")
 
+    planned_date = coerce_tracker_date(tracker_row.get(PLAN_COMPLETION_COL))
+    closure_date = planned_date.strftime("%d-%b-%Y") if planned_date is not None else "-"
+
     if mode == "evaluation":
         return {
             "dcr_id": dcr_id,
             "summary": str(summary) if pd.notna(summary) else "-",
             "status": eval_status_from_row(tracker_row),
-            "closure_date": closure_date_from_row(tracker_row, vis_row),
+            "closure_date": closure_date,
             "support": support_required_from_row(tracker_row),
             "remarks": latest_comment(tracker_row.get("Comments (Daily)"), max_len=None),
         }
@@ -53,7 +55,7 @@ def build_pending_item(
         "dcr_id": dcr_id,
         "summary": str(summary) if pd.notna(summary) else "-",
         "status": impl_status_from_row(tracker_row),
-        "closure_date": closure_date_from_row(tracker_row, vis_row),
+        "closure_date": closure_date,
         "support": support_required_from_row(tracker_row),
         "remarks": latest_comment(tracker_row.get("Comments (Daily)"), max_len=None),
     }

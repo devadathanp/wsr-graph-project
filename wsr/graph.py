@@ -160,6 +160,19 @@ def filter_section_through_friday(section: pd.DataFrame, report_date) -> pd.Data
     return filtered
 
 
+def mask_actual_through_friday(section: pd.DataFrame, actual: pd.Series, report_date) -> np.ndarray:
+    """Return actual completion % as an array, blanking weeks after the last Friday."""
+    values = to_percentage(actual).to_numpy(dtype=float).copy()
+    if report_date is None or section.empty or COL_DATE not in section.columns:
+        return values
+    cutoff = last_friday(report_date)
+    dates = pd.to_datetime(section[COL_DATE], errors="coerce").dt.normalize()
+    for index, week_date in enumerate(dates):
+        if pd.isna(week_date) or week_date > cutoff:
+            values[index] = np.nan
+    return values
+
+
 def get_evaluation_data(
     df: pd.DataFrame | None = None,
     data_file: str = DEFAULT_DATA_FILE,
